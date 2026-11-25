@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.optionsagent.snapshotprobe</string>
+  <!-- Polygon whole-market snapshot DELAY probe at Monday's open (2026-09-13):
+       decides the RVOL-EXEC executable window (09:35 real-time vs ~09:50 delayed).
+       One API call per firing. Copy to ~/Library/LaunchAgents and bootstrap. -->
+  <key>ProgramArguments</key><array>
+    <string>/Users/you/projects/OptionsAgent/.venv/bin/python</string>
+    <string>/Users/you/projects/OptionsAgent/scripts/ops/polygon_snapshot_delay_probe.py</string>
+  </array>
+  <key>StartCalendarInterval</key><array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>36</integer></dict>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>51</integer></dict>
+  </array>
+  <key>StandardOutPath</key><string>/Users/you/projects/OptionsAgent/logs/launchd_snapshotprobe.log</string>
+  <key>StandardErrorPath</key><string>/Users/you/projects/OptionsAgent/logs/launchd_snapshotprobe.log</string>
+</dict></plist>

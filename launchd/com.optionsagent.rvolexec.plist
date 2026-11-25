@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- RVOL-EXEC paper lane daemon — UNVALIDATED — PAPER ONLY.
+     FILE ONLY on this branch: NOT loaded. Commissioning step 4 copies it into
+     deploy/launchd/ and ~/Library/LaunchAgents/ after the merge (spec §18, §21).
+     Never `launchctl load` this between 09:33 and 16:00 ET (RunAtLoad is implied
+     by KeepAlive: the boot gate exits 0 outside the window, but do not rely on it).
+     StartCalendarInterval is 06:33 PT; phases are decided in ET by the daemon. -->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.optionsagent.rvolexec</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/caffeinate</string>
+		<string>-s</string>
+		<string>-i</string>
+		<string>/Users/you/projects/OptionsAgent/.venv/bin/python</string>
+		<string>/Users/you/projects/OptionsAgent/scripts/rvol_exec_daemon.py</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>/Users/you/projects/OptionsAgent</string>
+	<key>StartCalendarInterval</key>
+	<array>
+		<dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>33</integer></dict>
+		<dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>33</integer></dict>
+		<dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>33</integer></dict>
+		<dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>33</integer></dict>
+		<dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>33</integer></dict>
+	</array>
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
+	<key>ThrottleInterval</key>
+	<integer>30</integer>
+	<key>SoftResourceLimits</key>
+	<dict>
+		<key>NumberOfFiles</key>
+		<integer>4096</integer>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>/Users/you/projects/OptionsAgent/logs/launchd_rvolexec.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/you/projects/OptionsAgent/logs/launchd_rvolexec.log</string>
+</dict>
+</plist>

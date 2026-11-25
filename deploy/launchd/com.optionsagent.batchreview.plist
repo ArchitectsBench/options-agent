@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.optionsagent.batchreview</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/you/projects/OptionsAgent/.venv/bin/python</string>
+        <string>/Users/you/projects/OptionsAgent/src/research/batch_reviews.py</string>
+        <string>--wait</string>
+        <string>45</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/you/projects/OptionsAgent</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>17</integer>
+        <key>Minute</key>
+        <integer>15</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/you/projects/OptionsAgent/logs/launchd_batchreview.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/you/projects/OptionsAgent/logs/launchd_batchreview.log</string>
+</dict>
+</plist>

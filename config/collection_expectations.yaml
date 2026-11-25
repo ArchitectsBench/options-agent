@@ -1,0 +1,129 @@
+# COLLECTION EXPECTATIONS — pillar 1 of the proactive-monitoring plan
+# (user 2026-07-14: "spot and fix such issues beforehand").
+#
+# Every evidence stream DECLARES what a healthy trading day produces; the
+# daily ops sweep (scripts/ops_checks.py :: collection_health) asserts
+# actuals against these declarations. A collector that silently produces
+# nothing becomes an alarm within one ops cycle, not a week-3 discovery
+# (mark_series outage, labeler double-logging, dcexecq SPX no_legs, dead
+# nightly reporting — all of these were silent-absence failures).
+#
+# Semantics:
+#   path          — file per trading day; {date} = YYYY-MM-DD
+#   min_rows      — minimum JSONL rows for a healthy day
+#   where         — optional {field: value} row filter (counted rows only);
+#                   rows with dry_run_machinery_test=true never count
+#   due_after     — local time (HH:MM) the expectation matures; before that
+#                   the PREVIOUS trading day is asserted instead
+#   type: ledger_row_for_date — appended single-file ledger; healthy day =
+#                   >= 1 row whose `date_field` equals the target date
+#   type: exit_mark_series_ratio — fraction of the day's paper_exit events
+#                   carrying round_trip.mark_series must be >= min_ratio
+#                   (only asserted when the day has >= 1 exit)
+#
+# KNOWN APPROXIMATION: trading days = weekdays (numpy busdays). On US market
+# holidays every check falls back to the prior weekday's file and may still
+# false-alarm; ~9 days/year, tolerated — a false alarm is cheaper than a
+# silent gap. Add a holiday calendar here if the noise ever matters.
+
+expectations:
+  - name: observation_cycles
+    path: "logs/observation/{date}.jsonl"
+    min_rows: 50            # ~78 cycles on a full session
+    due_after: "13:10"      # complete after the close
+
+  - name: labels
+    path: "logs/observation/labels-{date}.jsonl"
+    min_rows: 100           # 150-230 typical
+    due_after: "21:30"      # nightly labeler
+
+  - name: breadth_snapshot
+    path: "logs/observation/breadth-{date}.jsonl"
+    min_rows: 10
+    due_after: "13:10"
+
+  - name: batch_verdicts
+    path: "logs/observation/batch_verdicts-{date}.jsonl"
+    min_rows: 5
+    due_after: "23:00"      # evening batch; asserts previous day in practice
+
+  - name: dcexecq_spx_s1
+    path: "logs/dcexecq/{date}.jsonl"
+    min_rows: 1
+    where: {struct: "SPX:S1"}
+    due_after: "10:30"      # 09:45 run + 30-min window
+    note: "the venue that matters for the Aug-24 evaluation gate"
+
+  - name: dcexecq_xsp_s1
+    path: "logs/dcexecq/{date}.jsonl"
+    min_rows: 1
+    where: {struct: "XSP:S1"}
+    due_after: "10:30"
+
+  - name: trendbook_daily_cycle
+    type: ledger_row_for_date
+    path: "logs/trendbook/ledger.jsonl"
+    date_field: "date"
+    due_after: "15:00"      # launchd 14:30 PT
+
+  - name: exit_mark_series_coverage
+    type: exit_mark_series_ratio
+    path: "logs/observation/fills.jsonl"
+    min_ratio: 0.8          # L13 give-back dataset must keep accruing
+    due_after: "13:10"
+
+  - name: gate_learning_daily
+    type: ledger_row_for_date
+    path: "logs/observation/gate_learning.jsonl"
+    date_field: "date"
+    due_after: "18:20"      # gatelearn 18:00, after enrich 17:45
+
+  - name: rvol_shadow_daily
+    path: "logs/observation/rvol_shadow-{date}.json"
+    type: rvol_shadow_scan  # NOT jsonl_min_rows (changed 2026-10-28): the scan's
+    min_names: 1            # failure mode is a well-formed 87-byte marker, which
+                            # satisfied min_rows: 1 — so this check could not fail
+                            # and scored 10-23/10-26/10-27 ok while the sleeve
+                            # paged `session LOST / no_top20`. Reads top20 instead.
+                            # EXPECTED to read FAIL every night until the Polygon
+                            # plan is renewed — that is the point, not a new fault.
+    due_after: "21:00"      # rvolshadow 14:10; ~6.5h at Polygon's ~5 req/min
+                            # throttle (measured 07-16: 1,907 candidates,
+                            # 17:05->23:31 — moved earlier for midnight margin)
+
+  - name: trendexec_paper_daily
+    type: ledger_row_for_date
+    path: "logs/trendbook/ledger.jsonl"
+    date_field: "date"
+    where: {record: "exec"}   # the IBKR paper executor's morning record;
+                              # target equality vs the shadow is asserted by
+                              # the dedicated ops trendexec section
+    due_after: "07:05"        # trendexec launchd 06:35
+
+  - name: rvolrank_sleeve_daily
+    type: ledger_row_for_date
+    path: "logs/observation/rvolrank_sleeve.jsonl"
+    date_field: "date"
+    due_after: "22:30"        # rvolrank launchd 21:30 (shadow due 21:00);
+                              # frozen criteria config/rvolrank_forward_criteria.yaml;
+                              # window starts 2026-07-20 — expectation active from then
+
+  - name: buyzone_radar_daily
+    type: ledger_row_for_date
+    path: "logs/alerts/summary.jsonl"
+    date_field: "date"        # the RUN's local calendar date — a run marker,
+                              # not a data-freshness check (a stale grouped
+                              # daily is rvol_shadow_daily's alarm)
+    due_after: "19:30"        # nightly_ops.sh buyzone_radar step (chain 18:40,
+                              # AFTER ops_checks — so the 18:40 check asserts
+                              # the previous weekday, one day of latency like
+                              # every other nightly-chain entry); the hourly
+                              # travel_catchup sweep appends here too.
+                              # 09-08..09-12: radar silent five sessions, no
+                              # alarm (added 2026-09-13)
+                              # EXPECTED one-time false alarm on 2026-09-14
+                              # (targets 09-11, which predates this row
+                              # schema); clean from 09-15
+
+# (ldteprem_sleeve_daily expectation REMOVED 2026-07-18 — sleeve retired
+#  before window open; holdout FAIL, see config/ldte_prem_forward_criteria.yaml)

@@ -1,0 +1,29 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+data/historical/
+data/agent_state.json
+data/paper_orders.json
+data/claude_budget.json
+logs/
+.DS_Store
+# data is backed up as a snapshot (Drive), not versioned — 2026-07-02
+# root-anchored 2026-07-14: bare 'data/' also ignored src/data/ and silently
+# unversioned new source modules there (found adding thetadata.py)
+/data/
+# session artifacts
+session_review_*.txt
+*.code-workspace
+ui/node_modules/
+ui/dist/
+# Claude Code local tool-permission grants (machine-local, not codebase)
+.claude/
+
+# O-23 operator HOLD flag — runtime state, never source (a committed HOLD
+# would silently re-hold every checkout)
+ops/HOLD
+
+# Operator scratch notes — contains credentials; never commit (added 2026-08-24)
+docs/workingnotes
+_to_delete/

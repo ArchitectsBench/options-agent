@@ -1,0 +1,125 @@
+# SCALP CANDIDATE — FORWARD ACCEPTANCE CRITERIA
+# Drafted 2026-07-09; FROZEN 2026-07-09T12:18:00-07:00 (user sign-off, all bars
+# as drafted incl. the $700 drawdown line). NO in-place edits from here —
+# dated amendment blocks only; amending after seeing results invalidates the test.
+#
+# Candidate spec: docs/scalp_candidate.md. Tracker: scripts/scalp_forward_check.py.
+# The motivating sample (Jun 25 - Jul 9, +$4,985/73% in benign tape) is NOT
+# evidence; evidence starts at window_start.
+
+# ---------------------------------------------------------------------------
+# AMENDMENT 2026-07-11 (dated block per the no-in-place-edits rule; user
+# directive: fills outside the contemporaneous bid/ask are paper-account
+# dynamics and must not count as evidence).
+#
+# MOTIVATION: the 2026-07-10 nightly journal flagged two TEST fills as
+# impossible against their own recorded quotes (NVDA entry 1.88 vs mid 4.075;
+# UBER 0.50 vs 1.085) — Tradier-sandbox artifacts, +$1,627 of fantasy P&L that
+# the tracker would have counted as frozen evidence.
+#
+# RULE (artifact_fill_filter below): a round trip is EXCLUDED from evidence
+# when its entry fill lies outside [bid - tol, ask + tol] at fill detection,
+# tol = max(tolerance_abs, tolerance_frac_of_mid * mid_at_fill). The tolerance
+# exists because mid_at_fill is snapshotted at fill DETECTION (up to one poll
+# cycle after the broker fill), so genuine quote drift of a few percent is
+# expected; 25%-of-mid instant mispricing is not (the artifacts run ~50%+).
+# Round trips with no entry-fill telemetry are excluded as UNVERIFIABLE
+# (fail-closed). Both exclusion counts must be reported in every tracker run —
+# silent drops are forbidden.
+#
+# WINDOW RESET: window_start moves 2026-07-09T12:18:00-07:00 ->
+# 2026-07-11T23:00:00-07:00 (this amendment). Cost: 2 accrued days / 10 round
+# trips discarded, of which 3 were artifacts under the new rule (NVDA +1,060,
+# UBER +567, GOOGL -10 — verified by running the tracker on the old window).
+# The rule is pre-registered BEFORE any evidence accrues under it.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# AMENDMENT 2026-07-14 (dated block; user directive in-session): entry cadence
+# cap paper_test_max_per_day raised 10 -> 20 (config.yaml). Motivation: the
+# 10-cap exhausted by ~08:00 PT every session — 3 of 56 clean lifetime trades
+# entered after 08:00 — so the evidence stream measured first-hour behavior
+# only, and afternoon candidates (which the label stream shows keep flowing)
+# were never sampled. max_open stays 7: sleeve risk capital and the $700
+# drawdown bar are unchanged. Entry-cadence change -> window RESET per
+# no_mid_stream_rule_changes. Cost: 3 accrued days / 16 qualifying trades
+# (preserved pre-window in the ledger). New per-session/per-structure splits
+# remain REPORT-ONLY; criteria numbers unchanged.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# AMENDMENT 2026-07-15 — MARKET-TRUTH SCORING (user-approved in-session).
+# T2a audit: SCALP booked +$3,480 vs +$218 at market mids over 70 enriched
+# trades; booked win rate 71% vs 47% at market prices — the sandbox flatters
+# every fill ~$0.04-0.12 (under the L17 radar, which stays for lifecycle
+# integrity). Scoring the simulator's own fills = lesson L21.
+# CHANGE: qualifying trades scored by true_pnl_mid from
+# logs/observation/enriched_trades_v1.jsonl (market-mid basis, declared
+# upper bound; superseded by IBKR real fills). Booked P&L kept as reported
+# diagnostic. Unenriched trades excluded pending enrichment (fail-closed,
+# counted); no_market_data excludes permanently. Trade/setup selection
+# UNTOUCHED. window_start reset: 2026-07-14T09:30 -> 2026-07-15T06:00.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# AMENDMENT 2026-09-12T22:55:27-07:00 — WINDOW CLOSED, CANDIDATE FAILED (operator decision).
+# v1's max_drawdown criterion is a peak-to-trough ratchet and stands at $3,684
+# against the $700 bar; it can never pass regardless of future sessions.
+# Profit factor 1.15 vs 1.3; IBKR-era truth -$31/trade. Root cause recorded in
+# docs/tradier_vs_ibkr_reassessment_20260912.md: the entry design (resting
+# limit at the decision mid) has no capturable edge in a real market; the
+# Tradier sandbox manufactured its apparent edge. Evidence from before this
+# timestamp remains the v1 record; nothing after it is v1 evidence.
+# Superseded by config/scalp_v2_forward_criteria.yaml (window opens now).
+# Everything below this block is UNTOUCHED.
+# ---------------------------------------------------------------------------
+scalp_forward:
+  status: CLOSED_FAILED    # closed 2026-09-12T22:55:27-07:00; was FROZEN 2026-07-09 (user sign-off); amended 07-11 + 07-14 + 07-15 (see blocks above)
+  window_end: "2026-09-12T22:55:27-07:00"
+  window_start: "2026-07-15T06:00:00-07:00"   # reset by 2026-07-15 amendment (prior: 07-14T09:30, 07-11T23:00, orig 07-09T12:18)
+  scoring: market_mid_v1   # added by 2026-07-15 amendment
+
+  artifact_fill_filter:    # added by 2026-07-11 amendment
+    enabled: true
+    tolerance_abs: 0.10            # $ per contract-unit price
+    tolerance_frac_of_mid: 0.25    # fraction of mid_at_fill
+    unverifiable_policy: exclude   # no entry telemetry -> not evidence
+
+  scope:
+    ledger: logs/observation/fills.jsonl
+    rec_id_tag: "-TEST-"           # plumbing tag retained; see docs/scalp_candidate.md
+    claude_approved_only: false    # DECLARED: this candidate is gate-free by design
+    include_fallback: true         # the SPY/QQQ/IWM fallback leg is part of the
+                                   # behavior and counts (declared drift exposure)
+
+  # Sample-size and regime coverage (all must hold) — mirrors the funnel gate:
+  min_trades: 100                  # closed round trips in scope
+  min_trading_days: 60             # calendar span in trading days (regime diversity;
+                                   # at ~10/day the trade count fills early — the
+                                   # days+adverse requirements are the binding ones)
+  adverse_regime_required: true    # >= 1 ISO week where SPY drew down >= 3% from a
+                                   # 20-day high OR VIX closed > 25 (same definition
+                                   # and code as the funnel gate). Non-negotiable:
+                                   # the motivating record has ZERO adverse days.
+
+  # Performance bar over the qualifying sample (all must hold):
+  min_forward_sharpe_ann: 0.8      # annualized Sharpe of daily sleeve P&L
+  min_profit_factor: 1.3           # gross wins / gross losses
+  max_drawdown_usd: 700            # peak-to-trough on cumulative sleeve P&L.
+                                   # Basis: sleeve risk capital = max_open (7) x
+                                   # per-trade budget ($1,000) = $7,000; bar = 10%,
+                                   # mirroring the funnel gate's construction.
+  per_structure_non_negative: true # 0dte_directional, debit_spread,
+                                   # premium_selling, fallback — each >= 0 total;
+                                   # one structure cannot hide another
+  concentration_check: true        # removing the top 2 winners must leave
+                                   # total P&L > 0
+
+  # Anti-gaming provisions (identical spirit to the funnel gate):
+  no_mid_stream_rule_changes: true # any change to the sleeve's entry/exit/sizing
+                                   # rules (incl. caps, z-overlay, fallback list)
+                                   # RESETS window_start
+  outcome: >
+    PASS opens a promotion DISCUSSION only (never auto-promote, never live
+    without the full two-stage discipline). FAIL retires the hypothesis and the
+    sleeve reverts to pure execution instrumentation.

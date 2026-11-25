@@ -1,0 +1,52 @@
+# Signal-data freshness floors (minutes). Single source of truth for the live
+# feed-guard (src/data/freshness.py + pipeline) AND the CLL (INV8 per-lane + the
+# data_suspect pre-gate). Created 2026-07-24 as the durable fix for the stale-bar
+# defect INV8 surfaced (feed cache guarded fetch-time, not bar-content-age).
+#
+# ── ASYMMETRY (approved 2026-07-24, mark 1): funnel is TWO numbers on purpose ──
+# The feed-guard and the pre-gate use DIFFERENT funnel floors because they take
+# DIFFERENT kinds of action:
+#   * feed_guard = IRREVERSIBLE. It BLOCKS a live trade. So it is conservative —
+#     block only EGREGIOUS staleness (funnel 20 min), to avoid suppressing good
+#     funnel entries on the routine ~5-15 min lag that a slower 2-7 DTE thesis
+#     tolerates. A wrongly-blocked trade cannot be un-blocked.
+#   * pre_gate  = REVERSIBLE. It TAGS an entry data_suspect (quarantined from the
+#     A-E taxonomy but recoverable, and re-adjudicable). It can be tighter
+#     (funnel 10-15, configurable) because a wrong tag costs nothing permanent.
+#   SCALP shares 3 min across both: 0DTE dies on one 5-min bar of staleness, and
+#   the SCALP age distribution is bimodal (near-0 vs ~one-bar), so 3 is robust.
+feed_guard_floor_min:       # LIVE BLOCK threshold (irreversible action)
+  SCALP: 3
+  funnel: 20
+
+pre_gate_floor_min:         # data_suspect TAG threshold (reversible); funnel not frozen
+  SCALP: 3
+  funnel: 12                # configurable in [10, 15]; sensitivity reported, one number NOT frozen
+
+# Pre-gate PRIMARY metric is underlying_drift_over_lag (ATR units); age above the
+# pre_gate floor is only the FALLBACK when drift is uncomputable. Drift thresholds
+# are intentionally UNSET here: the provisional drift numbers carried a
+# bar_time/snap.last alignment bug (mark 2); thresholds get chosen from the
+# corrected re-report during the pre-gate build, not from the provisional pass.
+drift_floor_atr:
+  SCALP: 0.10               # set 2026-07-24 from corrected distribution; bimodal, so
+                            # tagged count barely moves 0.05->0.10->0.25 (9/7/5 failures)
+  funnel: null              # NO funnel drift gate. funnel's drift has no natural break
+                            # and CONTROLS drift MORE than failures (0.595 vs 0.498), so
+                            # any floor is arbitrary and expensive. funnel gates on AGE
+                            # (pre_gate_floor_min.funnel); drift is persisted + reported
+                            # as a covariate only.
+
+# ── feed-layer thresholds (mark 3: all freshness numbers live in THIS file) ──
+cache_max_serve_min: 360    # _cache_put/fetch_intraday: never serve a cached frame
+                            # whose newest bar is older than this (was hardcoded 6h)
+missing_bars_max: 2         # pre-gate MISSING-BAR test: tag data_suspect when more
+                            # than this many 5-min bars are absent between the signal
+                            # bar and entry within a session (halt / feed dropout).
+                            # cross-session (weekend/overnight) tags regardless (drift-
+                            # blind). One-bar-stale (1 missing) stays -> drift governs.
+backfill_stale_trigger_min: 3   # a bulk 5m frame older than this is treated as a MISS:
+                            # route it to the per-ticker Tradier backfill BEFORE the
+                            # decision guard blocks (mark 1). If the backfill returns a
+                            # fresher bar it's a recovery (logged stale_bar_recovered);
+                            # if it's also stale/fails, the guard blocks it (stale_bar).

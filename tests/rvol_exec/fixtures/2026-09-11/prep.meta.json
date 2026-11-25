@@ -1,0 +1,21 @@
+{
+ "prep_for": "2026-09-11",
+ "built_from_through": "2026-09-10",
+ "generated_at": "2026-09-10T23:35:00",
+ "n_candidates": 638,
+ "n_rankable": 638,
+ "api_calls": 0,
+ "api_errors": 0,
+ "allow_api": false,
+ "sources": {
+  "fixture": 638
+ },
+ "coverage": {
+  "candidates": 638,
+  "with_baseline14": 638,
+  "without_baseline": 0,
+  "store_through_date": "2026-09-10"
+ },
+ "stamp": "UNVALIDATED \u2014 PAPER ONLY",
+ "note": "synthetic fixture: baseline14 = 09:30 bar v / shadow rvol so the rank reproduces the shadow top-20; atr14/avgvol14 from the grouped store via prep.daily_features"
+}

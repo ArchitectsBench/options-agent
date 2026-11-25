@@ -1,0 +1,203 @@
+/* OptionsAgent Cockpit — design tokens (handoff README "Design System / Tokens").
+   One component tree; themes switch via [data-theme] on <html>.
+   Semantic P&L colors are constant across dark themes; Paper overrides them. */
+
+:root,
+[data-theme="night"] {
+  --accent: #4aa8ff;
+  --accent-dark: #2b6fd6;
+  --accent-rgb: 74, 168, 255;
+  --bg-app: #0a0c10;
+  --bg-rail: #0d1015;
+  --bg-panel: #0f1319;
+  --bg-inset: #0c1016;
+  --bg-track: #20262f;
+  --bg-tile: #12161d;
+  --border-panel: #1c232d;
+  --border-rail: #1a1f27;
+  --border-inset: #1c2530;
+  --border-tile: #242c38;
+  --hero-border: #24303f;
+  --hero-bg: radial-gradient(120% 140% at 0% 0%, #111a26 0%, #0e1218 55%);
+  --text-1: #e6e8ec;
+  --text-2: #c8d0da;
+  --text-3: #aeb6c2;
+  --text-4: #9aa3b0;
+  --text-5: #8a94a2;
+  --text-6: #7a8494;
+  --text-7: #6a7482;
+  --text-8: #626b78;
+  --text-9: #5a6472;
+  --hairline: #3a424e;
+  /* semantic (constant on dark themes) */
+  --grn: #35d07f;
+  --red: #ff5a5f;
+  --amb: #f0b23a;
+  --dir: #ff8b6a;
+  /* fonts */
+  --font-ui: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-heading: var(--font-ui);
+}
+
+[data-theme="amber"] {
+  --accent: #ffb000;
+  --accent-dark: #c77f00;
+  --accent-rgb: 255, 176, 0;
+  --bg-app: #0c0a05;
+  --bg-rail: #100c06;
+  --bg-panel: #130f08;
+  --bg-inset: #100d07;
+  --bg-tile: #16120a;
+  --hero-bg: radial-gradient(120% 140% at 0% 0%, #1d1607 0%, #120e08 55%);
+  --hero-border: #3a2f14;
+}
+
+[data-theme="ice"] {
+  --accent: #38c6e0;
+  --accent-dark: #1f8fb0;
+  --accent-rgb: 56, 198, 224;
+  --bg-app: #080b12;
+  --bg-rail: #0a0e17;
+  --bg-panel: #0c111b;
+  --bg-inset: #0a0f18;
+  --bg-tile: #101724;
+  --hero-bg: radial-gradient(120% 140% at 0% 0%, #0f1c26 0%, #0b111b 55%);
+  --hero-border: #1d3340;
+}
+
+[data-theme="nebula"] {
+  --accent: #8b5cf6;
+  --accent-dark: #6d3fd6;
+  --accent-rgb: 139, 92, 246;
+  --bg-app: #0b0910;
+  --bg-rail: #0e0b16;
+  --bg-panel: #110e1b;
+  --bg-inset: #0e0b17;
+  --bg-tile: #151021;
+  --hero-bg: radial-gradient(120% 140% at 0% 0%, #1a1428 0%, #100d1a 55%);
+  --hero-border: #2c2344;
+}
+
+[data-theme="paper"] {
+  --accent: #22537f;
+  --accent-dark: #173a5e;
+  --accent-rgb: 34, 83, 127;
+  --bg-app: #e7e1d4;
+  --bg-rail: #efe9dd;
+  --bg-panel: #fbf9f3;
+  --bg-inset: #f2ecdf;
+  --bg-track: #ddd5c4;
+  --bg-tile: #efe9dc;
+  --border-panel: #dcd5c6;
+  --border-rail: #dcd5c6;
+  --border-inset: #dcd5c6;
+  --border-tile: #d5cdbc;
+  --hero-border: #cfc6b2;
+  --hero-bg: #fbf9f3;
+  --text-1: #201d18;
+  --text-2: #2e2a22;
+  --text-3: #3c372c;
+  --text-4: #4a4436;
+  --text-5: #585140;
+  --text-6: #665e4a;
+  --text-7: #746b54;
+  --text-8: #82785e;
+  --text-9: #a49c8b;
+  --hairline: #dcd5c6;
+  --grn: #1f8a4d;
+  --red: #c22f34;
+  --amb: #a06a12;
+  --dir: #bb5a2a;
+  --font-ui: "Libre Franklin", system-ui, sans-serif;
+  --font-heading: "Newsreader", serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100vh;
+}
+body {
+  background: var(--bg-app);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.4;
+}
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Shared base for every interactive control (ActionButton). Full <button>
+ * reset for pixel parity with the old div/span controls, plus the
+ * double-click / data-detector guard (non-selectable) and a keyboard focus
+ * ring. Controls are non-selectable by rule; data stays selectable. */
+.ui-control {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: none;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ui-control:disabled {
+  cursor: default;
+}
+.ui-control:focus {
+  outline: none;
+}
+.ui-control:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Region-level opt-out of text selection for pure-control clusters
+ * (toolbars, button rows). Never apply to data/table/feed regions. */
+.control-region {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.caption {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--text-8);
+  font-weight: 600;
+}
+
+@keyframes pulseDot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes ringPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 90, 95, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(255, 90, 95, 0);
+  }
+}

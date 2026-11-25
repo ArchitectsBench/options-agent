@@ -1,0 +1,186 @@
+# Machine-readable strategy rules (Track A, Stage 1 output format).
+# Every strategy must be expressible here — no vague logic.
+
+# ── Per-strategy indicator applicability map (CLAUDE.md "Applicability Logic") ──
+# requires: ALL must be satisfiable; an unavailable feed makes the strategy
+#           UNEVALUABLE (not blocked) — honesty about missing data.
+# confirms: scored but never blocking.
+# ignores:  explicitly irrelevant — must NOT veto (e.g., flat MACD is the
+#           POINT of a condor).
+applicability:
+  # gex_amplifying/gex_suppressive REMOVED from all confirm lists 2026-07-11
+  # (user decision, option A of analysis/gex/gex_amplifying_review_20260711.md):
+  # enforces the 2026-07-09 GEX-is-context-only ruling. Measured on 1,176
+  # cycles the label fired 95% of the time (zero information), 51% of firings
+  # contradicted the net-GEX sign, and as sole confirm it pushed 0.70->0.76
+  # over the 0.75 Claude threshold (the 07-10 24-veto budget burn). GEX stays:
+  # collected/logged, on the cockpit, in Claude's review context, and as the
+  # 0dte data-availability REQUIRE below. Evaluators stay live in
+  # applicability.py for any future pre-registered restore. This is an
+  # entry-rule change -> funnel forward clock RESET (see
+  # config/forward_acceptance.yaml amendment 2026-07-11).
+  0dte_directional:
+    requires: [gex, tick, vwap_tight]
+    confirms: [squeeze_5m, volume_surge, vol_active]
+    ignores: [squeeze_30m, ema_stack_30m]
+  debit_spread:            # 2-7 DTE directional (call/put debit spreads)
+    requires: [squeeze_15m_or_30m, ema_stack_aligned, rs_leading]
+    confirms: [macd_confirms, vwap_with_trend, volume_surge, vol_active]
+    ignores: [tick]
+  # premium_selling RETIRED 2026-07-01 — the final pre-committed bear-exclusion
+  # iteration (existing regime gate AND prior-day close > 200d SMA) FAILED the
+  # revised Stage-6 gate in all 12 cells: best cell Sharpe -0.21 at MID fills,
+  # ~50% maxDD at bid/ask, negative in every regime bucket incl. the 2024-26
+  # trend-up years the filter selects for. Loss is structural (thin level-VRP
+  # vs ~0.15:1 reward:risk on 16-delta condors + 4-leg costs), not bear
+  # exposure. Arc closed per the pre-committed decision boundary — see
+  # logs/research/premium_selling_final_iteration_20260701.md. The live paper
+  # sleeve was also break-even (+$10/9 trades, 44% WR) in a benign tape.
+  # Evaluators (gex_positive/adx_low/iv_rank_over_40/vwap_rangebound) stay
+  # live; restore this block only with a fundamentally different monetization.
+  #   requires: [gex_positive, adx_low, iv_rank_over_40]
+  #   confirms: [vwap_rangebound, gex_suppressive, vol_calm]
+  #   ignores: [macd_confirms, ema_stack_aligned, squeeze_direction]
+  reversal:
+    requires: [tick_extreme, vix_spike, at_key_level]
+    confirms: [volume_surge, vol_calm]   # gex_suppressive removed 2026-07-11 (see block above)
+    ignores: [ema_stack_aligned, macd_confirms]
+  # orb_breakout RETIRED 2026-06-15 — gen-4b re-validation on 5yr/multi-regime
+  # 5m (gen4b_orb log) FAILED the gate: full Sharpe 0.12, OOS ~0, MC5 negative,
+  # and -0.59 in the 2022 bear (no standalone alpha; gen-4a pulse was bull beta).
+  # Evaluators (orb_break_long/trend_aligned_long/before_orb_cutoff) and the
+  # opening-range SIGNAL stay live — so ORB can be re-evaluated offline anytime
+  # and re-instated by restoring this block. Removed from the live loop only.
+  #   requires: [orb_break_long, volume_surge, trend_aligned_long, before_orb_cutoff]
+  #   confirms: [rs_leading, gex]
+  #   ignores: [squeeze_5m, squeeze_15m_or_30m, macd_confirms]
+
+# ── Step 4c intraday-native families (all session_flat: true) ──
+
+squeeze_regime:
+  description: >
+    Gen-3: gen-1 squeeze_proxy signal (params frozen at bb=36, width_pct=0.31,
+    mom=23), entries permitted only when a daily regime filter is ON. Regime
+    label for session N uses data through session N-1 close. Filter variants:
+    vix_calm (VIX<T), vix_vol (VIX>T), adx_trend (ADX>T), rv_band (RV pctile
+    in [lo,hi]). True walk-forward: filter params re-optimized per fold.
+  direction: both
+  timeframe: 1h (signals) + 1d (regime)
+  indicators:
+    bb_width_rank: { type: rolling_percentile, window: 126 }
+    momentum_ema: { type: ema, period: 23 }
+    rv_pctile: { type: realized_vol_percentile, window: 20, rank_window: 252, shift: 1 session }
+    adx_daily: { type: adx, period: 14, shift: 1 session }
+    vix: { type: external_daily_close, shift: 1 session }
+  entry: squeeze release AND regime gate ON (NaN feature = gate OFF)
+  exit: close crosses momentum EMA against position OR session_end
+  execution: next_bar_open
+  session_flat: true
+
+orb_v2:
+  description: >
+    Gen-2 ORB. Single-side variants (long-only / short-only) evaluated
+    separately; entries cut off at 13:00 ET; exit via fixed ATR target or
+    trailing ATR stop (variant axis). Costs 1.5bp/side base case.
+  direction: per-variant (long or short)
+  timeframe: 1h
+  indicators:
+    or_high: { type: session_range_high, bars: optimized }
+    or_low: { type: session_range_low, bars: optimized }
+    atr: { type: atr, period: 14 }
+    volume_avg: { type: sma, source: volume, period: 20 }
+  entry: first close beyond OR boundary before 13:00 ET, optional volume confirm
+  exit: stop at opposite OR side; fixed ATR target OR trailing ATR stop; session_end
+  execution: next_bar_open
+  session_flat: true
+
+orb:
+  description: Opening range breakout. OR = first N bars of session.
+  direction: both
+  timeframe: 1h
+  indicators:
+    or_high: { type: session_range_high, bars: optimized }
+    or_low: { type: session_range_low, bars: optimized }
+    atr: { type: atr, period: 14 }
+    volume_avg: { type: sma, source: volume, period: 20 }
+  entry: first close beyond OR high (long) / OR low (short), optional volume confirm
+  exit: stop at opposite side of OR, optional ATR-multiple target, OR session_end
+  execution: next_bar_open
+  session_flat: true
+
+vwap_trend:
+  description: Pullback to session VWAP that holds, in direction of established session trend.
+  direction: both
+  timeframe: 1h
+  indicators:
+    vwap: { type: session_vwap }
+    atr: { type: atr, period: 14 }
+  entry: prior session run >= ext_atr*ATR from VWAP AND bar touches VWAP zone AND closes back in trend direction
+  exit: close crosses VWAP against position OR session_end
+  execution: next_bar_open
+  session_flat: true
+
+vwap_reversion:
+  description: Fade extensions beyond K*ATR from session VWAP, confirmed N bars.
+  direction: both
+  timeframe: 1h
+  indicators:
+    vwap: { type: session_vwap }
+    atr: { type: atr, period: 14 }
+  entry: close beyond K*ATR from VWAP for confirm_bars consecutive bars (fade it)
+  exit: close reverts to VWAP OR session_end
+  execution: next_bar_open
+  session_flat: true
+
+momentum_reentry:
+  description: >
+    Intraday EMA momentum WITH daily re-entry: bullish stack at session close
+    re-enters at next session open (fixes the no-re-entry flaw).
+  direction: long
+  timeframe: 1h
+  indicators:
+    ema_fast: { type: ema, period: optimized, source: close }
+    ema_slow: { type: ema, period: optimized, source: close }
+  entry: cross_above(ema_fast, ema_slow) OR (session last bar AND ema_fast > ema_slow)
+  exit: cross_below(ema_fast, ema_slow) OR session_end
+  execution: next_bar_open
+  session_flat: true
+
+squeeze_proxy:
+  description: Bollinger width percentile squeeze; enter on expansion after bottom-quartile width.
+  direction: both
+  timeframe: 1h
+  indicators:
+    bb_width: { type: bollinger_width, period: optimized }
+    width_rank: { type: rolling_percentile, window: 126 }
+    momentum_ema: { type: ema, period: optimized }
+  entry: squeeze releases (width rank leaves bottom percentile, width expanding); direction = close vs momentum EMA
+  exit: close crosses momentum EMA against position OR session_end
+  execution: next_bar_open
+  session_flat: true
+
+ema_crossover_1h:
+  description: >
+    Long when EMA(fast) crosses above EMA(slow) on 1h bars; exit on cross
+    below OR at the last bar of the session (day-trading mandate: flat
+    overnight). fast/slow set by Stage 4 optimization.
+  direction: long
+  timeframe: 1h
+  indicators:
+    ema_fast: { type: ema, period: optimized, source: close }
+    ema_slow: { type: ema, period: optimized, source: close }
+  entry: cross_above(ema_fast, ema_slow)
+  exit: cross_below(ema_fast, ema_slow) OR session_end
+  execution: next_bar_open
+  session_flat: true
+
+ema_9_21_crossover:
+  description: Long when EMA(9) crosses above EMA(21); exit when it crosses below.
+  direction: long
+  timeframe: 1d
+  indicators:
+    ema_fast: { type: ema, period: 9, source: close }
+    ema_slow: { type: ema, period: 21, source: close }
+  entry: cross_above(ema_fast, ema_slow)
+  exit: cross_below(ema_fast, ema_slow)
+  execution: next_bar_open

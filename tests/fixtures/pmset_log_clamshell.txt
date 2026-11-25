@@ -1,0 +1,9 @@
+2026-11-05 10:30:02 -0800 Assertions          	Summary- [System: PrevIdle PrevSleep kCPU] Using AC(Charge: 98)
+2026-11-05 11:05:02 -0800 Notification        	Display is turned off
+2026-11-05 11:05:07 -0800 Sleep               	Entering Sleep state due to 'Clamshell Sleep': Using Batt (Charge:97) 4 secs
+2026-11-05 11:22:14 -0800 DarkWake            	DarkWake from Normal Sleep [CDNVA] : due to RTC/Maintenance
+2026-11-05 11:24:30 -0800 Sleep               	Entering Sleep state due to 'Maintenance Sleep': Using Batt (Charge:96)
+2026-11-05 11:59:41 -0800 Wake                	Wake from Normal Sleep [CDNVA] : due to lid open/HID Activity
+2026-11-05 11:59:47 -0800 Assertions          	Summary- [System: PrevIdle] Using AC(Charge: 96)
+2026-11-05 12:30:05 -0800 Sleep               	Entering Sleep state due to 'Idle Sleep': Using Batt (Charge:95)
+2026-11-05 12:45:00 -0800 Wake                	Wake from Normal Sleep [CDNVA] : due to HID Activity

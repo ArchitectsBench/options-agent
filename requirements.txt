@@ -1,0 +1,15 @@
+yfinance
+pandas
+pyarrow
+pyyaml
+optuna
+typer
+apscheduler
+python-dotenv
+anthropic
+websockets
+
+fastapi>=0.115
+uvicorn[standard]>=0.32
+duckdb  # discovery program query engine (DuckDB-when-slow decision)
+scipy  # DSR/PBO stats (discovery program)

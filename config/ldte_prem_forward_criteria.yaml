@@ -1,0 +1,64 @@
+# ---------------------------------------------------------------------------
+# RETIRED 2026-07-18 (user confirmation in-session) — BEFORE any evidence
+# accrued (window never opened). The hypothesis was falsified by the frozen
+# holdout shot LDTE-HOLDOUT-2026-07-18 (FAIL: +0.0096R OOS, t=0.67, 6x decay
+# vs discovery; see K21 update_2026_07_18b), and the ThetaData EOD backfill
+# proved ~90% sparse besides. launchd job unloaded; cockpit section removed.
+# File kept as the historical record of a correctly-run pre-registration.
+# ---------------------------------------------------------------------------
+# LDTE-PREM SLEEVE — FORWARD ACCEPTANCE CRITERIA
+# Drafted + FROZEN 2026-07-18 (user directive: observation-mode sleeves for
+# discovery candidates). NO in-place edits — dated amendment blocks only.
+# Evidence starts at window_start; the discovery numbers (K21: +0.058R,
+# 85% breadth, 2007-21) are the MOTIVATION, not evidence.
+#
+# WHAT IS BEING TESTED (K21 corner, declared hypothesis R2c):
+# short put spread, 60-90 DTE at entry, short leg nearest 30-delta, long
+# wing nearest 10-delta, entered ONLY when the ticker's term-structure slope
+# (front ~30d ATM IV minus back ~90d ATM IV, ThetaData-EOD-derived, single
+# source) sits in the BOTTOM QUINTILE of its trailing 252-session window;
+# HELD TO EXPIRY (no early exit — the single-crossing economics are the
+# point; vwap-invalidation and profit-target exits do NOT apply). One open
+# position per ticker. Recommendations flow through the normal observation
+# pipeline, stamped UNVALIDATED — PAPER ONLY.
+# Universe (frozen): SPY, QQQ, IWM, AAPL, MSFT, NVDA, AMZN, GOOGL.
+#
+# EVIDENCE HORIZON, stated plainly: with 60-90d holds and a 20%-of-days
+# condition, ~25 completed round trips require roughly 6-9 months. This is
+# a slow evidence stream by design; it costs nothing and cannot be rushed.
+
+# ---------------------------------------------------------------------------
+# AMENDMENT 2026-07-18 (dated block; user directive "Lets do that" —
+# acceleration via throughput, BEFORE any evidence accrued; window opens
+# 2026-07-20, ledger empty at amendment time).
+# UNIVERSE widened 8 -> 50 names: the full deep-history single-name set plus
+# SPY/QQQ/IWM (SPX/XSP excluded — index-option EOD coverage on the ThetaData
+# Standard plan unverified; equity/ETF only). Entry flow rises ~6x so the
+# 25-trip gate fills in weeks, not months; correlation across same-market
+# names is why the adverse-regime and worst-quarter gates stay unchanged.
+# SPOT SOURCE extended: data/historical parquet when present, else ThetaData
+# stock EOD close (same-source family as the feature feed). Feature warmup:
+# names whose iv_term backfill completes after 2026-07-20 enter when their
+# 120-session minimum is met (backfill provides ~270 sessions immediately).
+# universe_amended_2026_07_18: [SPY, QQQ, IWM, AAPL, ADBE, AMD, AMZN, APP,
+#   ARM, ASML, AVGO, BA, BABA, BAC, BIDU, CAT, COST, CRM, DELL, FDX, FICO,
+#   FSLR, GOOG, GOOGL, GS, IBM, INTC, JPM, LLY, LRCX, LULU, MARA, MSFT,
+#   MSTR, MU, NFLX, NKE, NVDA, ORCL, OXY, PYPL, SMCI, TSLA, TSM, UAL, UNH,
+#   V, WFC, WMT, XOM]
+# ---------------------------------------------------------------------------
+
+window_start: "2026-07-20T00:00:00-07:00"
+ledger: "logs/observation/ldte_prem_sleeve.jsonl"
+feature_history: "data/iv_term/"           # ThetaData-derived, single-source
+
+acceptance:                    # ALL must hold; evaluated only at >= min trips
+  min_completed_round_trips: 25
+  mean_R_min: 0.0
+  worst_quarter_mean_R_min: -0.50
+  max_single_trade_share_of_pnl: 0.5   # no one winner carrying the sleeve
+  adverse_regime_required: true        # >=1 month with VIX close > 25 inside
+                                       # the window
+
+reporting:
+  entry events, feature percentile at entry, open-position marks weekly,
+  completed trips with full R accounting; silent skips forbidden

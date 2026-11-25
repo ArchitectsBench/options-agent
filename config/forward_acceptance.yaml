@@ -1,0 +1,108 @@
+# FORWARD ACCEPTANCE CRITERIA — pre-committed 2026-07-01 (user decision, option (a)
+# of docs/live-readiness-review-2026-07-01.md).
+#
+# These criteria are FROZEN. They were written before the evidence accrues;
+# amending them after looking at forward results invalidates the test (see the
+# ORB and base+EQGROW false passes for why). Any change requires a dated
+# amendment block below, never an in-place edit.
+#
+# Two-stage promotion (revised Stage 6, CLAUDE.md 2026-07-01 amendment):
+#   1. Backtest pass (Sharpe >= 0.8, OOS >= 0.6 & >= 0.6x IS, maxDD <= 20%,
+#      MC 5th-pct >= 0.0, worst-year Sharpe >= 0.0, >= 100 trades)
+#      -> promoter writes the strategy to validated_strategies.yaml and it may
+#         generate observation-mode recommendations tracked for forward stats.
+#   2. Forward pass (this file) -> strategy becomes eligible for LIVE
+#      recommendations. Live mode (when built) MUST check both stages.
+
+# ---------------------------------------------------------------------------
+# AMENDMENT 2026-07-11 — funnel forward clock RESET (per the file's own
+# no_mid_stream_rule_changes provision; user decision, option A of
+# analysis/gex/gex_amplifying_review_20260711.md).
+#
+# WHAT CHANGED: gex_amplifying/gex_suppressive removed from all confirm lists
+# in config/strategy_rules.yaml — an ENTRY-RULE change (confirms feed the
+# deterministic confidence that decides which candidates reach Claude), so the
+# clock resets. The change enforces the standing 2026-07-09 decision that GEX
+# is context only and never adjusts conviction/scoring/verdicts; the confirm
+# wiring predated that decision and had survived by oversight.
+#
+# window_start added: qualifying trades are round trips ENTERED on/after this
+# stamp (tz-aware; naive ledger stamps are America/Los_Angeles). Accrual
+# discarded at reset: ~19 qualifying trades / 10 trading days (preserved in
+# the ledger and git history; nothing deleted). The criteria themselves
+# (bars, scope, provisions) are UNCHANGED.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# AMENDMENT 2026-07-15 — MARKET-TRUTH SCORING (user-approved in-session).
+# The T2a fill-integrity audit (analysis/fill_integrity_audit_20260715.md)
+# measured systematic sandbox fill flattery on both streams (funnel booked
+# −$91 vs −$566 at market mids). A gate that scores the simulator's own
+# fills adjudicates simulator generosity, not strategy merit (lesson L21).
+# CHANGE: qualifying trades are scored by market-truth P&L (true_pnl_mid
+# from logs/observation/enriched_trades_v1.jsonl — minute-NBBO mids for the
+# exact contracts; a declared UPPER BOUND on real execution, superseded by
+# real fill reports after the IBKR migration). Booked P&L stays a reported
+# diagnostic. Trades not yet enriched are EXCLUDED pending enrichment
+# (fail-closed, counted); status no_market_data excludes permanently.
+# Trade/setup selection is UNTOUCHED — scoring basis only.
+# window_start reset (evidence basis changed): 2026-07-11T23:30 ->
+# 2026-07-15T06:00 (cost: ~4 qualifying trades, preserved as history).
+# ---------------------------------------------------------------------------
+
+forward_acceptance:
+  window_start: "2026-07-15T06:00:00-07:00"   # reset by 2026-07-15 amendment (was 07-11T23:30)
+  scoring: market_mid_v1                       # added by 2026-07-15 amendment
+
+  # What counts as a qualifying trade: production alpha-funnel only.
+  scope:
+    claude_approved_only: true      # live Claude verdict, not mock batch reviews
+    exclude_execution_tests: true   # paper_test_mode / EXECUTION-TEST fills never count
+    ledger: logs/observation/fills.jsonl  # post-2026-06-25 reset ledger only
+
+  # Sample-size and regime coverage requirements (all must hold):
+  min_trades: 100                   # closed round-trips in scope
+  min_trading_days: 60              # calendar span of the sample, trading days
+  adverse_regime_required: true     # sample must span >= 1 week where SPY drew down
+                                    # >= 3% from a 20-day high OR VIX closed > 25;
+                                    # a benign-tape-only sample cannot pass
+
+  # Performance bar over the qualifying sample (all must hold):
+  min_forward_sharpe_ann: 0.8       # annualized Sharpe of daily strategy P&L
+  min_profit_factor: 1.3            # gross wins / gross losses
+  max_drawdown_pct_of_risk_capital: 10   # peak-to-trough on cumulative P&L,
+                                         # as % of allocated risk capital
+  per_sleeve_non_negative: true     # every enabled strategy sleeve individually
+                                    # >= 0 total P&L; one sleeve cannot hide another
+
+  # Anti-gaming provisions:
+  no_mid_stream_rule_changes: true  # any change to entry/exit/sizing rules of a
+                                    # sleeve RESETS that sleeve's forward clock
+  concentration_check: true         # removing the top 2 winning trades must leave
+                                    # total P&L > 0 (guards single-outlier "edge")
+
+# ---- NOTE 2026-09-14 (evidence-basis change, operator-directed) ----------
+# The live validator model changed claude-opus-4-8 -> claude-opus-5 at
+# ~12:45 PT on 2026-09-14 (operator: "upgrade to Fable or Opus 5, best
+# judgement"; Opus 5 chosen: same price, drop-in, Anthropic's default upgrade
+# path). "claude_approved_only" trades before and after this point were
+# approved by DIFFERENT models. Criteria untouched; window_start NOT reset
+# here — the current window has already failed max_drawdown irrecoverably
+# (63.6% vs 10%, peak-to-trough cannot shrink), and whether a fresh
+# pre-registered window opens is the operator's decision (OBJECTIVES C-2/C-5).
+# Any future window should start on or after this timestamp so one model
+# validates the whole sample.
+
+# ---- NOTE 2026-09-29 (validator OFF, operator-directed) ------------------
+# "Keep everything except claude veto turning off." llm.claude.enabled: false
+# from the evening of 2026-09-29. Every funnel candidate above the local
+# threshold is HELD (validator disabled by operator); nothing is placed on
+# local-only approval, so NO claude_approved_only trades can accrue from this
+# point. Criteria untouched. Whether a re-enabled validator RESUMES or RESETS
+# the funnel clock is the operator's determination under this frozen file
+# (no_mid_stream_rule_changes applies to the entry chain), not the agent's;
+# nothing rides on it — the current window had already failed max_drawdown
+# irrecoverably (see the 2026-09-14 note above). Trading the funnel without
+# the veto would be a new evidence basis and needs a new pre-registered
+# window (OBJECTIVES C-13).
+

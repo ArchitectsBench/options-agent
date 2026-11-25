@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.optionsagent.bars5mfill</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/you/projects/OptionsAgent/.venv/bin/python</string>
+		<string>/Users/you/projects/OptionsAgent/scripts/bars5m_backfill.py</string>
+		<string>--max-minutes</string>
+		<string>440</string>
+		<string>--until</string>
+		<string>06:00</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict><key>BF_SLEEP</key><string>1</string></dict>
+	<key>WorkingDirectory</key>
+	<string>/Users/you/projects/OptionsAgent</string>
+	<key>StandardOutPath</key>
+	<string>/Users/you/projects/OptionsAgent/logs/bars5m_backfill.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/you/projects/OptionsAgent/logs/bars5m_backfill.log</string>
+	<key>StartCalendarInterval</key>
+	<array>
+		<dict><key>Hour</key><integer>22</integer><key>Minute</key><integer>45</integer></dict>
+	</array>
+</dict>
+</plist>

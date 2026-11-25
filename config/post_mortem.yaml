@@ -1,0 +1,52 @@
+# Trade Post-Mortem Engine — configuration (Phase 1, 2026-07-23)
+
+failure_definition:
+  # a trade is FAILED if truth_pnl < 0 AND any rule below fires
+  rules: [stop, max_loss, loss_beyond_pct, thesis_invalidation]
+  loss_threshold_pct: 25          # loss_beyond_pct: |truth_pnl| >= X% of max_dollar_risk
+  thesis_invalidation_reasons: [vwap_invalidation]
+
+exit_trigger_enum:                # closed set; engine refuses to write others
+  - vwap_invalidation
+  - target_50
+  - flatten_1545
+  - stop
+  - stop_50        # 2026-09-13: the engine's canonical code for stop_loss exits
+                   # (src/engine/paper_trader.py exit_reason_code) — first emitted
+                   # late Aug; its absence here failed cll_nightly 08-31..09-11
+  - max_loss
+  - manual
+  - unknown
+
+mae_mfe:
+  denominator: max_dollar_risk    # MAE/MFE expressed as % of recorded max_dollar_risk
+
+rv_low_confidence_minutes: 240    # rv_minus_iv flagged low_confidence below this hold
+
+paths:
+  output_dir: logs/post_mortems
+  orats_dir: data/iv_history_full
+  bars5m_dir: data/research_orb/bars5m
+  bars5m_fresh_dir: data/research_orb/bars5m_fresh
+
+macro_calendar_2026:              # seeded manually (source: FOMC/BLS published schedules)
+  fomc: ["2026-01-28", "2026-03-18", "2026-04-29", "2026-06-17", "2026-07-29",
+         "2026-09-16", "2026-10-28", "2026-12-09"]
+  cpi:  ["2026-07-14", "2026-08-12", "2026-09-11", "2026-10-13"]
+
+phase2:                          # ruleset p2_v1 (docs/post_mortem_phase2_ruleset.md, approved 2026-07-23)
+  a_mfe_guard_pct: 10            # review mark #1: configurable; result recorded per A-test
+  d1_share: 0.50
+  d2_tolerance: 1.10
+  a1_vwap_atr: 2.0
+  a2_volume_ratio: 0.5
+  a4_iv_rank: 0.90               # KEPT: provenance = live chain-derived snapshots (not ORATS mirror)
+  b1_move_pct: 1.0
+  b3_atr_mult: 1.5
+  c1_mfe_pct: 30
+  c3_max_minutes: 60
+  e_percentile: 95
+  e_share_flag: 0.70
+  thresholds_version: p2_v1
+  # booked_winner_truth_loser: booked-winner exits (target_50/flatten_1545)
+  # that lost at truth are forced to FAILURE, never control (item 4, 07-23)

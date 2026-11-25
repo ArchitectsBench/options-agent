@@ -1,0 +1,52 @@
+# SHADOW GATE — option-(b) counterfactual test, PRE-REGISTERED 2026-07-10
+#
+# User decision: live gate unchanged (option c — no clock reset, no live-path
+# edit). In PARALLEL, shadow-track what an option-(b) gate WOULD have selected:
+# candidates whose CALIBRATED confidence >= 0.50 under the map frozen below
+# (the 2026-07-10 isotonic fit — copied verbatim from
+# config/calibration_remap.yaml.proposed and never refit for this test; a
+# refit would make the target move).
+#
+# RULES (frozen):
+#   - Evaluation window: labels from 2026-07-11 forward ONLY (the map was fit
+#     through 2026-07-10; scoring earlier days would be in-sample).
+#   - Metric: counterfactual UNDERLYING direction-signed forward returns
+#     (cf_30m/cf_60m/cf_eod from the labels dataset) — a Level-1 proxy, NOT
+#     option P&L; unposted candidates were never traded.
+#   - Cohorts compared: shadow-PASS vs shadow-FAIL (all labeled candidates with
+#     confidence+direction), plus the posted funnel cohort as reference.
+#   - Verdict question (for the OCTOBER generation decision only): does the
+#     shadow-pass cohort beat shadow-fail on cf_eod hit-rate and mean by a
+#     margin that survives its sample size?
+#   - HARD RULE: this test can inform the October confidence-source decision
+#     ONLY. It must never trigger a mid-stream live-gate change (that resets
+#     the funnel forward clock; see forward_acceptance no_mid_stream_rule_changes).
+#
+# Reporting: scripts/shadow_gate_report.py, weekly via the review charter.
+
+shadow_gate:
+  registered: "2026-07-10"
+  threshold_calibrated: 0.50
+  window_start_labels: "2026-07-11"
+  map_provenance: calibration_proposal_20260710 (isotonic PAV, n=3857, 20 days)
+  interpolation: linear   # clamp outside range
+  breakpoints:            # raw_conf -> calibrated_conf (FROZEN 2026-07-10)
+    - {raw: 0.30, calibrated: 0.4400}
+    - {raw: 0.35, calibrated: 0.4400}
+    - {raw: 0.40, calibrated: 0.4400}
+    - {raw: 0.45, calibrated: 0.4400}
+    - {raw: 0.50, calibrated: 0.4599}
+    - {raw: 0.55, calibrated: 0.4599}
+    - {raw: 0.60, calibrated: 0.4599}
+    - {raw: 0.65, calibrated: 0.4599}
+    - {raw: 0.70, calibrated: 0.4599}
+    - {raw: 0.75, calibrated: 0.4599}
+    - {raw: 0.76, calibrated: 0.4599}
+    - {raw: 0.80, calibrated: 0.4599}
+    - {raw: 0.82, calibrated: 0.4599}
+    - {raw: 0.85, calibrated: 0.4599}
+    - {raw: 0.88, calibrated: 0.5084}
+    - {raw: 0.90, calibrated: 0.5084}
+    - {raw: 0.94, calibrated: 0.5401}
+    - {raw: 0.95, calibrated: 0.5401}
+    - {raw: 1.00, calibrated: 0.5401}

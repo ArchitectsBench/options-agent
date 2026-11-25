@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.optionsagent.weeklyreview</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/you/projects/OptionsAgent/scripts/weekly_checkin.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/you/projects/OptionsAgent</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>5</integer>
+        <key>Hour</key>
+        <integer>16</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/you/projects/OptionsAgent/logs/launchd_weeklyreview.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/you/projects/OptionsAgent/logs/launchd_weeklyreview.log</string>
+</dict>
+</plist>

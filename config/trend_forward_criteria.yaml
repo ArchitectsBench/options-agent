@@ -1,0 +1,30 @@
+# TRACK C — TREND-BOOK FORWARD CRITERIA — frozen 2026-07-06, BEFORE the
+# first order. Amendments only as dated blocks; never edit in place.
+#
+# Context: hybrid trend book v3 (logs/research/hybrid_trend_v3_20260706.md)
+# passed its pre-registered implementability line (Sharpe 0.60 / OOS 0.59 /
+# DD -13.7%) but NOT the strict Stage-6 gate. This sleeve therefore runs
+# OBSERVATION-ONLY on IBKR paper. Its purpose is measurement, not promotion:
+# a ~0.6-Sharpe book cannot prove itself in months of P&L, but its COSTS and
+# its TRACKING against simulation can be verified precisely.
+
+trend_forward:
+  mode: observation_only          # no real capital; promotion NOT on the table
+  design: hybrid_trend_v3 frozen  # signal/sizing/legs exactly as the v3 study
+  min_duration_months: 12         # slow book; nothing concluded earlier
+
+  # what the forward test must demonstrate (all required):
+  tracking:
+    daily_return_tracking_error_ann_max: 0.02   # live vs same-day simulation
+    unexplained_position_diffs: 0               # every deviation must have a
+                                                # logged cause (fill, margin)
+  measured_costs:
+    all_in_vs_model_max_ratio: 1.5   # actual (fills+commissions+financing)
+                                     # vs the v3 cost model
+  discipline:
+    risk_limit_violations: 0         # leverage cap, sizing, kill-switch honor
+
+  # what passing MEANS (pre-committed): a promotion DISCUSSION may open,
+  # informed by 12 months of measured reality — it does not conclude one.
+  # The strict Stage-6 gate remains the promotion standard unless a gate
+  # amendment is adopted PROSPECTIVELY (never retrofitted to seen results).

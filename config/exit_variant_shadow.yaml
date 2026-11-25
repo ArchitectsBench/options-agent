@@ -1,0 +1,111 @@
+# Exit-variant shadow study — FROZEN 2026-07-22 (before prospective data)
+# User-submitted rule (2026-07-22): TP 30% when entry-time regime bias is
+# NOT bullish/bearish; TP 50% when it is. Tested retrospectively on wk of
+# 07-20 (56 trades): actual +$924, flat TP30 +$2,389, cond 30/50 +$2,676.
+# Retrospective = hypothesis-forming only. This file freezes the
+# PROSPECTIVE comparison. The live SCALP/funnel exits are UNCHANGED until
+# the criteria below are met and adopted by dated amendment.
+
+variants:
+  actual: the lane's real exits (baseline)
+  tp30_flat: exit at first minute mid >= entry_mid * 1.30, else actual
+  tp_cond_30_50: threshold 1.50 if entry-time regime bias in
+    [bullish, bearish] else 1.30; exit at first touch, else actual
+  # DECLARED 2026-07-23 (winner give-back G3, variant slot 1 of 2). Motivated
+  # by the flatten_1545 SCALP bleed (median 95 min peak->exit) + rescue table
+  # (MFE>=10% losers gave back median 26.8% of risk). Params FROZEN here.
+  peak_trail:
+    arm_mfe_pct_of_risk: 20     # arm the trail once sustained MFE reaches this
+    trail_retrace_pct_of_peak: 33   # then exit on this % retrace from the peak
+    else: actual                # if never armed, take the actual exit
+    applies_to: all SCALP shadow trades (not only flatten exits)
+
+measurement:
+  basis: truth mids (ThetaData minute NBBO), same convention as gates
+  tracker: scripts/exit_shadow_tracker.py nightly (idempotent per rec_id)
+  ledger: logs/observation/exit_variants.jsonl
+
+adoption_criteria:   # ALL required; no mid-study edits
+  min_trades: 150
+  min_trend_entries: 40
+  min_chop_entries: 40
+  winner_beats_actual_overall: true
+  winner_beats_actual_in_BOTH_regime_slices: true
+  margin: winner total >= actual total * 1.15
+  then: dated amendment to the lane's exit rules + fresh forward window note
+
+# ── FROZEN 2026-07-23, BEFORE any give-back (G2) aggregation was viewed ──
+# Generic adoption criteria for ANY new exit variant declared out of the
+# winner give-back study. Deliberately trigger-agnostic: no reference to
+# exit-trigger types, the vwap pattern, or any G1 preview. Any variant G3
+# proposes is measured PROSPECTIVELY in the shadow tracker against these.
+new_variant_adoption_criteria:
+  max_new_variants_this_round: 2
+  min_shadow_trades: 150            # prospective trades scored at truth
+  baseline: actual                  # the lane's real exits
+  expectancy:
+    metric: mean truth P&L per trade, % of max risk
+    require: variant_mean - baseline_mean > 0
+    ci: 95% bootstrap CI of the paired per-trade difference EXCLUDES 0
+  drawdown:
+    metric: max peak-to-trough of the cumulative truth-P&L curve
+    require: variant_max_dd <= baseline_max_dd  (no worsening beyond +2% of risk)
+  robustness:
+    require: variant beats baseline in BOTH regime slices (trend / non-trend),
+             sign-consistent, no single-trade dominance (survives top-2 removal)
+  friction: net-of-exit-friction truth basis only (gb_v1 net_capturable convention)
+  process:
+    declared_before_results: true   # criteria frozen here precede G2 view
+    live_exits_unchanged_until: dated amendment after all above pass
+    freeze_hash_note: "committed pre-G2 aggregation, commit below"
+
+# ════════════════════════════════════════════════════════════════════════════
+# DATED AMENDMENT 2026-08-01 — slot 2 DECLARED: tp_cond_30_50 (user-approved)
+# ════════════════════════════════════════════════════════════════════════════
+# tp_cond_30_50 (params frozen above since 2026-07-22, BEFORE the prospective
+# window) is hereby declared shadow-variant slot 2 of 2, adoption gate
+# mirroring peak_trail's (new_variant_adoption_criteria above, ALL required).
+#
+# IN-SAMPLE EXCLUSION: the motivating window (2026-07-22..07-31 ledger,
+# tp_cond $13,339 vs actual $2,162, n=117) is the sample that PROMPTED this
+# declaration and is EXCLUDED from adoption evaluation.
+#
+# AMENDMENT A (user, 2026-08-01): the gate's evaluation window accrues from
+# declaration, but adoption evaluation counts ONLY post-IBKR-cutover trades —
+# variant-vs-actual changes meaning when actual exits become honest fills; no
+# blended-regime gate. Pre-cutover accrual is texture/monitoring only.
+slot2_tp_cond_30_50:
+  declared: "2026-08-01"
+  params_frozen_since: "2026-07-22"   # predates ALL prospective data
+  adoption_gate: new_variant_adoption_criteria   # mirror of peak_trail's
+  evaluation_window: post_ibkr_cutover_only      # AMENDMENT A
+  in_sample_excluded: "2026-07-22..2026-07-31 (n=117, the motivating window)"
+  registry: hypothesis_registry.jsonl#tp_cond_30_50
+
+# ── AMENDMENT B (user, 2026-08-01): entry-time day-regime stamp ──
+# The gate's "both regime slices" test reads THIS field exclusively.
+# Hindsight/end-of-day day labels may appear in reports but are BARRED from
+# gate evaluation. Computed at shadow-write time from ONLY data available at
+# the trade's entry cycle (cycle rows with ts <= entry_ts).
+regime_stamp_v1:
+  inputs:
+    spot_series: "regime.gex.spot from logs/observation/<day>.jsonl cycles ts <= entry_ts"
+    atr: "ATR14 of SPY daily bars (data/historical/SPY.parquet), as of the PRIOR session"
+    gex_sign: "regime.gex.sign at the last cycle <= entry_ts"
+    vix: "regime.vix at the last cycle <= entry_ts"
+  formula:
+    er: "abs(spot_t - spot_first) / (max(spot<=t) - min(spot<=t))   # directional efficiency 0..1"
+    rr: "(max(spot<=t) - min(spot<=t)) / ATR14_prior                # range expansion so far"
+  label:
+    strong: "er >= 0.60 and rr >= 0.50"
+    chop: "er < 0.40"
+    mild: "otherwise"
+    insufficient: "fewer than 4 cycles before entry (excluded from slices)"
+  gate_slice: "trend if label in (strong, mild) else chop; insufficient excluded"
+  thresholds_note: >
+    er/rr cutoffs are standard efficiency-ratio conventions frozen at
+    declaration (2026-08-01), chosen without reference to any accrued
+    shadow outcome; no mid-study edits.
+  persisted_fields: [regime_stamp, regime_er, regime_rr, regime_gex_sign, regime_vix, regime_slice]
+  coverage_note: forward-only from 2026-08-01 (existing rows unstamped; gate
+    counts only post-cutover trades anyway, per AMENDMENT A)

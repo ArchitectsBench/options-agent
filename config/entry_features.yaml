@@ -1,0 +1,72 @@
+# Entry-snapshot feature enrichment — INSTRUMENTATION ONLY (declared 2026-08-03).
+#
+# Candidate context features recorded on EVERY entry snapshot going forward
+# (src/engine/entry_features.py), under snapshot["entry_features"]. Captured for
+# PROSPECTIVE evaluation post-cutover ONLY — recorded, never evaluated; zero
+# comparisons run now. Consulted by NO live decision, gate, selector, freshness
+# check, or the exit shadow-tracker's evaluation.
+#
+# This file is the exact-definition record (frozen with the code). If a
+# definition changes, bump schema_version in BOTH here and entry_features.py so
+# any future prospective slice can tell the versions apart.
+
+schema_version: entry_features_v1
+declared: 2026-08-03
+status: recorded_not_evaluated        # flips to evaluable only post-cutover, prospectively
+
+fields:
+  time_from_open_min:
+    definition: >
+      Minutes from the 06:30 PT session open to the entry timestamp
+      (entry_ts - datetime.combine(entry_date, 06:30)). Entry ts is naive local
+      (PT) by construction. Negative only if an entry ever preceded the open
+      (should not happen intraday).
+    units: minutes
+    null_when: entry_ts unparseable
+
+  opening_range:
+    definition: >
+      Position of the current underlying price within TODAY's opening range.
+      high/low/position are taken verbatim from signals[ticker].opening_range
+      (already computed by the signal engine). pos_pct = (last - low) /
+      (high - low), i.e. 0 at the OR low, 1 at the OR high, outside [0,1] on an
+      OR breakout. last = signals[ticker].last.
+    fields: [high, low, last, position, pos_pct]
+    null_when: opening_range or last absent, or high <= low
+
+  spy_breadth_proxy:
+    definition: >
+      The already-computed breadth proxy from the regime object:
+      net_adv_pct = regime.tick_proxy.net_adv_pct (net-advancers % over the
+      ~50-name breadth snapshot), plus its source label and regime.breadth.
+      This is the LABELLED PROXY, not a real NYSE TICK feed — recorded verbatim.
+    fields: [net_adv_pct, source, breadth]
+    null_when: regime.tick_proxy absent
+
+  spread_width_strikes:
+    definition: >
+      Structural strike width of the spread in dollars (distance between the two
+      leg strikes), via src.engine.paper_trader.strike_width on trade.legs.
+      None for single-leg structures (e.g. long_call). NOTE: the bid-ask
+      EXECUTION spread is captured SEPARATELY in
+      logs/observation/spread_telemetry.jsonl (rel_spread per candidate,
+      joinable by ticker+time) and is intentionally NOT re-derived here so this
+      module touches no selector/trade-building code.
+    units: dollars
+    null_when: single-leg or leg strikes unparseable
+
+  prior_day_hl_proximity:
+    definition: >
+      Proximity of the current underlying price to the PRIOR session's daily
+      high/low, in ATR units (entry-time-available — prior session only, no
+      lookahead). prior_high/prior_low = last daily bar strictly before the
+      entry date in data/historical/<ticker>.parquet. to_prior_high_atr =
+      (prior_high - last)/atr; to_prior_low_atr = (last - prior_low)/atr.
+      last = signals[ticker].last, atr = signals[ticker].atr.
+    fields: [prior_high, prior_low, to_prior_high_atr, to_prior_low_atr]
+    units: ATR (proximity fields)
+    null_when: parquet missing, no prior bar, or last/atr absent
+
+# Deliberately NOT captured here (and why):
+#   * bid-ask execution spread at entry -> already in spread_telemetry.jsonl;
+#     re-deriving it would mean touching the options selector. Join prospectively.

@@ -1,0 +1,6 @@
+# Winner Give-Back Study — G1 config (gb_v1, approved 2026-07-23 w/ 4 marks)
+give_back:
+  sustained_window_min: 3           # rolling median window for sustained_mfe (mark 1)
+  efficiency_floor_pct: 10          # efficiency computed only if sustained_mfe >= this % of risk (mark 2)
+  friction_fallback_pct_of_mid: 0.03  # per-side half-spread proxy when a leg quote is missing (mark 1)
+  thresholds_version: gb_v1

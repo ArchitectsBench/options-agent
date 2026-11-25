@@ -1,0 +1,50 @@
+# Continuous Learning Loop — master config (cll_v1). Spec:
+# docs/continuous_learning_loop_spec.md. Tier 1 (nightly+integrity) live now;
+# weekly=dev, rounds dormant until post-migration.
+version: cll_v1
+
+baseline:
+  active_pin: "sandbox-2026-07-24"     # mirrors logs/learning/baselines/ACTIVE
+  min_sessions_to_pin: 30              # re-pin accumulation window
+  ruleset: p2_v1                       # frozen classifier ruleset
+
+tiers:
+  nightly:
+    enabled: true
+  weekly:
+    enabled: true
+    mode: dev                          # dev now -> live when re-pin completes
+    blocked_by_integrity_hold: true
+  round:
+    enabled: false                     # dormant until post-migration + human start
+    requires_human_start: true
+    trigger_new_failures: 200
+    blocked_by_integrity_hold: true
+    max_promotions_per_round: 2
+    cooling_period_sessions: 10
+    economics_min_winners: 15
+    economics_min_losers: 15
+    economics_bootstrap: { ci: 0.95, straddles_zero: inconclusive }
+
+integrity:
+  inv1_d_share_tol: 0.02
+  inv2_pct_consistency_tol: 0.15       # |stored pct - truth_pnl/max_dollar_risk*100|
+  inv3_clamp: strict
+  inv4_funnel_control: enforce
+  inv5_shadow_actual_tol: 0.01
+  inv7_reconstructed_risk_rel_tol: 0.02   # max_dollar_risk vs qty*entry_mid*100 (debit)
+  inv8_signal_age_max_min: 30             # measured max ~25 (funnel tail); CRITICAL above -> frozen feed
+  hold:
+    block: [weekly, round]
+    clear: human_only
+    clear_requires: reason_string      # + optional commit_ref
+    quarantine: all_three_ledgers
+
+deflate:
+  method: deflated_sharpe              # consistent with RVOL-RANK frozen 2.9 bar
+
+streams:
+  scalp:            { status: active,  procedure: winner_control_blocked_economics }
+  funnel:           { status: active,  procedure: winner_control_blocked_economics, role: integrity_control }
+  rvol_rank:        { status: admission_pending }
+  watchlist_events: { status: admission_pending, fill_counterfactual: false }

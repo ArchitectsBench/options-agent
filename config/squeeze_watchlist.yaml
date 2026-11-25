@@ -1,0 +1,83 @@
+# Squeeze Watchlist state machine + alert config — created 2026-07-23 as the
+# precondition fix for the Alert System build (audit found M1-M4).
+# MANUAL DECISION SUPPORT — describes state changes; never says buy/sell.
+
+# ── Invalidation rules (M4: were UNDEFINED; defined explicitly here) ──
+# A zone or fire is invalidated when ANY fires (evaluated per timeframe):
+invalidation:
+  momentum_flip:        true   # momentum-histogram SIGN flips against the
+                               # setup direction (long setup -> hist<0, or v.v.)
+  stop_structure_breach: true  # close beyond the invalidation level:
+                               #   long  -> close < (EMA21 - stop_atr*ATR)
+                               #   short -> close > (EMA21 + stop_atr*ATR)
+  squeeze_reforming:    true   # POST-FIRE ONLY (addition 3, 2026-07-23):
+                               # after a release (BB expanded outside KC), the
+                               # tier squeeze turns back ON (BB re-enters KC).
+                               # This NEVER invalidates a pre-fire zone that is
+                               # simply still squeezed — a still-coiled setup is
+                               # live, not invalidated. Boundary = state must be
+                               # FIRED/PULLBACK/EXTENDED for this rule to apply.
+  stop_atr: 1.5                # invalidation level distance in ATR(14)
+
+# ── Earnings session handling (M3: BMO/AMC) ──
+earnings:
+  warn_days: [2, 1]            # emit earnings_window at E-2d and E-1d
+  e0_rule: "emit earnings_window on E-0d if session==AMC (pending); if
+            session==BMO and past the open -> earnings_passed; if session
+            UNKNOWN -> emit earnings_window AS IF AMC-pending, tagged
+            session:unknown (addition 1, 2026-07-23: never suppress on
+            missing data)."
+  # addition 1: AlphaVantage EARNINGS_CALENDAR is PRIMARY (date source),
+  # yfinance FALLBACK. AV needs ALPHAVANTAGE_API_KEY in .env; absent today
+  # -> degrades to yfinance until the key is added (like NASDAQ_DATA_LINK_KEY
+  # was). Neither source reliably carries BMO/AMC for obscure names, so
+  # session is usually 'unknown' and handled by the e0_rule above.
+  date_source_primary: alphavantage_EARNINGS_CALENDAR
+  date_source_fallback: yfinance
+  session_source: "best-effort (yfinance timestamp hour if present); date-only
+                   -> session:unknown, DISPLAYED as unknown, never guessed."
+
+# ── Aging rule (removed transition) ──
+aging:
+  keep_sessions: 10            # a ticker ages off after this many sessions
+                               # since 'added' with no re-add; emits 'removed'
+
+# ── Dedup + cooldown (A1 item 4) ──
+cooldown:
+  reentry_bars: 3              # a re-entry within N bars of invalidation
+                               # re-opens the SAME state_instance_id with
+                               # re_entered=true (no new instance / no flap)
+
+# ── Timeframes with independent state machines (A1 item 1) ──
+timeframes:
+  enabled: ["1d", "1h"]        # active lanes (1m absent: we store 5-min bars)
+  disabled:
+    - "5m"                     # placeholder lane — pending intraday refresh +
+                               # delay resolution post-migration (item 1,
+                               # 2026-07-23). Defined, NOT implemented.
+    - "1m"                     # no 1-minute data in store
+
+# ── Staleness gate (item 2b, 2026-07-23) ──
+# data_asof lag beyond threshold (in sessions) tags events stale_data:true.
+# A2 must DEMOTE stale events (grey/badge/sort-below), never hide them.
+staleness:
+  max_lag_sessions:
+    "1d": 1
+    "1h": 2
+  # 5m/1m would go here when enabled
+
+# ── Event log retention / archival (Phase A3, 2026-07-23) ──
+retention:
+  events_keep_days: 30         # events.jsonl keeps a rolling 30-day HOT window;
+                               # older events roll to the immutable archive
+  archive_dir: "logs/alerts/archive"
+  archive_monthly: true        # append to archive/events-YYYY-MM.jsonl (the
+                               # archive is append-only + never trimmed = the
+                               # permanent record; events.jsonl is the window)
+
+# ── Watchlist bars refresh (item 2a) ──
+bars_refresh:
+  enabled: true                # nightly refresh of 5m bars for CURRENT
+                               # watchlist names so 1h + rvol_current are fresh
+  lookback_days: 45            # enough for 1h EMAs + 14-day RVOL baseline
+  skip_if_fresh: true          # only pull names whose store lags 'day'

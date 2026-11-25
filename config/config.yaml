@@ -1,0 +1,228 @@
+agent:
+  # RULE-CONSISTENCY GATE (2026-08-06). Exit closes a long at vwap_dist<0 and a
+  # short at >0 with no buffer, but entry had no matching requirement — 10 of 21
+  # entries on 08-06 were opened ALREADY inside the exit condition (0 winners,
+  # median hold 1 cycle). Entry now requires this margin on the correct side.
+  # PROVISIONAL and CHOSEN, not derived. Exit rule untouched.
+  entry_vwap_margin_atr: 0.25
+  # ITEM 3 (2026-08-05): a partially-filled entry is booked immediately at the
+  # FILLED quantity and enters normal management; the unfilled remainder is
+  # cancelled after this many seconds. No signal revalidation (out of scope).
+  partial_fill_remainder_cancel_seconds: 60
+  # FULL MIGRATION TO IBKR PAPER (2026-08-04, operator decision).
+  # Both lanes: SCALP auto-submits, funnel stays confirmation-required.
+  # Orders route to the IBKR paper gateway (127.0.0.1:4002, acct DUQ000000)
+  # and fill against REAL OPRA quotes instead of Tradier sandbox fantasy
+  # fills (which disagreed on P&L SIGN in 26% of 2026-08-04's trades).
+  # Truth basis for scoring is UNCHANGED: ThetaData minute NBBO mids.
+  # Revert = set this back to tradier_sandbox and restart.
+  # RE-FLIPPED 2026-08-05 06:48 after the thread-confinement fix (b9e7094).
+  # The 06:35 hang was ib_async event-loop thread affinity; the client now runs
+  # on one dedicated thread with per-call timeouts, so a wedged IBKR call
+  # degrades (ambiguous/None) instead of freezing the cycle. Verified against
+  # the live gateway from 4 concurrent threads.
+  # RE-APPLIED 2026-08-06 06:25 PT per runbook step 1 (mandatory first).
+  # Engine runs on IBKR paper: real OPRA fills, no sandbox fantasy fills.
+  broker: ibkr_paper
+  # dated amendment 2026-08-03 (user-approved, effective immediately):
+  # SCALP and funnel keep INDEPENDENT position books (per-lane
+  # one-position-per-ticker); shared registry let SCALP starve the funnel
+  # (08-03: HOOD x10/WMT x6 position_exists kills). Rollback: set false.
+  lane_isolation: true
+  cycle_minutes: 5
+  market_hours: { start: "06:30", end: "13:00", tz: "America/Los_Angeles" }
+  auto_start: false
+  # Paper-EXECUTION test mode (sandbox only): deliberately fire the paper-order
+  # path on structurally-valid (applicability=viable) setups to validate
+  # fills/exits/sizing end-to-end. NOT an edge claim — orders tagged
+  # EXECUTION-TEST. LIVE trading stays fully gated regardless of this flag.
+  paper_test_mode: true       # re-enabled 2026-06-25 (user wants orders to keep firing)
+  mode: observation           # observation | live. 'live' is gated (src/engine/live_gate.py,
+                              # 2026-07-02): requires a Stage-6 validated strategy AND a
+                              # forward-acceptance PASS AND live credentials AND the (unbuilt)
+                              # live execution layer — the agent REFUSES to start otherwise.
+  confirm_mode: false         # recommend-and-confirm drill (2026-07-02): when true,
+                              # approved funnel recs are QUEUED for `trader confirm <rec_id>`
+                              # instead of auto-submitted (paper). Live mode always confirms.
+                              # Default off so forward-test throughput never waits on a human.
+  confirm_expiry_min: 15      # unanswered confirmation asks expire after this
+  watchdog_enabled: true      # streaming stop/target reflex loop (2026-07-03):
+                              # ~1s exit reaction on open positions vs 5-min cycle;
+                              # cycle remains the backstop if the stream degrades
+  paper_test_max_open: 7      # cap concurrent test positions (kept at 7: ~$7k
+                              # simultaneous max-loss is enough correlated risk)
+  # ── SCALP-v2 (DRAFT 2026-09-12, operator-requested) ──────────────────────
+  # Pre-registered candidate: docs/scalp_v2_prereg.md + config/scalp_v2_forward_criteria.yaml.
+  # OFF by default. Flipping `enabled` is the activation act and RESETS the v2
+  # window_start (write it into the criteria file the same minute). While off,
+  # every v1 behaviour is byte-identical.
+  scalp_v2:
+    enabled: true               # ACTIVATED 2026-09-12T22:55:27-07:00 (operator: 'go ahead')
+    fill_mode: marketable_day   # ACTIVATED 2026-09-16T14:01:38-07:00 (operator: option 4).
+                                # limit = mid + aggressiveness*spread (SAME price as
+                                # marketable_ioc) but tif=DAY; the ENGINE cancels an
+                                # unfilled entry after entry_timeout_min. IBKR refuses
+                                # IOC on a SMART combo (error 201), so this is the only
+                                # marketable form a SPREAD can use — under IOC all 44
+                                # spread entries were rejected on arrival.
+                                # WINDOW RESET to this timestamp: see the 2026-09-16
+                                # amendment in config/scalp_v2_forward_criteria.yaml.
+                                # Pre-registered prediction is ADVERSE (-$48/trade on
+                                # the replay, docs/scalp_fill_design_grid_20260916.md);
+                                # the operator elected to test it on live data.
+    entry_timeout_min: 5        # marketable_day only: cancel an unfilled entry here
+    reattempt_cooldown_min: 30  # marketable_day only: bar the same ticker+strategy+
+                                # direction this long after a cancel (churn guard)
+    aggressiveness: 0.5         # 0.5 = the natural (ask for buys); 0 = mid
+    min_net_debit: 1.00         # price floor: sub-$1 contracts pay ~11% of premium
+                                # to cross vs ~4% above $3
+    max_per_day: 10             # operator: 10 (not 4) — 2026-09-12  (FILLED entries)
+    max_attempts_per_day: 30    # IOC ATTEMPTS (filled + unfilled). An unfilled IOC
+                                # consumes no fill slot, so without this the engine
+                                # could fire unbounded attempts on a day nothing fills
+  scalp_v3:                     # FILTER LAYER on scalp_v2 (docs/scalp_v3_prereg.md)
+    enabled: true               # ACTIVATED 2026-09-25T15:19:27-07:00 (operator: 'run v3').
+                                # v2 stays enabled as the base (caps, $1 floor, exits,
+                                # sizing); v3 narrows it. Window + gates:
+                                # config/scalp_v3_forward_criteria.yaml (FROZEN).
+    tickers: [SPY, QQQ, IWM]
+    strategies: [0dte_directional]   # single-leg only; debit-spread fallback OFF
+    entry_window_et: ["09:35", "11:30"]   # start inclusive, end exclusive
+    min_volume_ratio: 0.8
+    fill_mode: marketable_ioc   # single legs accept IOC (IBKR only refused combos)
+    shadow_direction_frame: 5m  # recorded on each rec, never used to trade
+  paper_test_max_per_day: 20  # 10->20 (2026-07-14, user): the 10-cap exhausted by
+                              # ~8am PT leaving the afternoon unsampled (56-trade
+                              # clean history: 3 entries ever after 08:00) — raise
+                              # funds time-of-day coverage. max_open stays 7 so the
+                              # sleeve risk basis (and the $700 DD bar built on it)
+                              # is unchanged. Scalp window reset per the 07-14
+                              # amendment in scalp_forward_criteria.yaml.
+  adopt_foreign: false        # false = app IGNORES any order/position it didn't
+                              # place (safe to share this sandbox account for your
+                              # own manual/overnight trades). true = app manages
+                              # (cancels/flattens) everything in the account.
+  # 2026 NYSE full-day holidays
+  holidays_2026: ["2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03",
+                  "2026-05-25", "2026-06-19", "2026-07-03", "2026-09-07",
+                  "2026-11-26", "2026-12-25"]
+  # 2026 NYSE EARLY CLOSES — date -> session end in PT (agent.market_hours.tz).
+  # Source: live Tradier calendar() probe 2026-11-24 — both days carry
+  # close 13:00 ET; 2026-07-03 is a FULL holiday (above), not an early close.
+  # The live tick does not need this (market_open() asks the Tradier clock,
+  # which knows half-days); it exists for the half-day-BLIND static fallback
+  # and for scripts/ops/liveness.py, which has no exchange calendar at all.
+  early_close_2026: {"2026-11-27": "10:00", "2026-12-24": "10:00"}
+
+llm:
+  local:
+    provider: ollama
+    # benchmarked 2026-06-10 on this M5/32GB: qwen2.5:32b = 118s warm @ 1.1 tok/s
+    # (memory-bound, 4x over budget); llama3.1:8b = 8.6s warm @ 20.9 tok/s.
+    # Measured numbers, not assumptions: 8b is primary. Revisit qwen via a
+    # smaller quant (e.g. qwen2.5:14b) if synthesis quality disappoints.
+    model: llama3.1:8b
+    fallback: llama3.1:8b
+    max_latency_seconds: 30
+  claude:
+    # CLAUDE.md pinned claude-sonnet-4-20250514, which is deprecated (retires
+    # 2026-06-15). Updated to the current Opus alias per Anthropic docs.
+    # 2026-09-14 (operator: "upgrade to Fable or Opus 5, best judgement"):
+    # claude-opus-5 — drop-in successor to 4.8 at the SAME price ($5/$25 per
+    # MTok), adaptive thinking (the call already sends it), refusal handled as
+    # HELD. Fable 5.1 was NOT chosen: 2x the price ($10/$50) for a structured
+    # JSON validation the Opus tier handles; Opus 5 is Anthropic's stated
+    # default upgrade path. Note: the validator model is part of the funnel's
+    # evidence basis — recorded in config/forward_acceptance.yaml.
+    model: claude-opus-5
+    # 2026-09-29 OPERATOR DECISION ("Keep everything except claude veto turning
+    # off"): the validator is OFF. No Anthropic API call is made anywhere; every
+    # conf >= threshold funnel candidate is HELD ("validator disabled by
+    # operator"), never placed on local-only approval. The funnel lane
+    # therefore books nothing while this is false; SCALP-v3 and RVOL-EXEC do
+    # not use the gate and are unaffected. Also the master switch for
+    # batch_reviews below. Flip to true only by operator decision (O-33).
+    enabled: false
+    invoke_threshold: 0.75
+    max_calls_per_day: 30   # 20->30 (2026-07-02, funnel-throughput): hit 17/20
+                            # on 07-01; Batches pre-screen halved unit cost, and
+                            # the risk gate now runs BEFORE Claude so risk-blocked
+                            # candidates no longer consume calls
+    ticker_cooldown_minutes: 90
+    batch_reviews:              # nightly mock reviews (Batches API, 50% cost,
+      enabled: false            # separate from the live budget above)
+                                # 2026-09-29: off with the validator (API spend);
+                                # the 17:15 launchd job stays loaded, exits "disabled"
+      max_per_night: 24
+      per_group_cap: 3          # per ticker+strategy+direction+status group
+
+watchlist:
+  # second 15 selected empirically 2026-06-12 via scripts/liquidity_screen.py
+  # (live near-ATM spreads vs our own $0.20/OI-500 filters; most semis FAILED
+  # the absolute cap — only SMCI/PLTR/INTC qualified)
+  default: [AAPL, MSFT, NVDA, AMZN, TSLA, META, AMD, GOOGL, SPY, QQQ, NFLX, JPM, XOM, COST, CRM,
+            PYPL, MARA, SMCI, XLE, XLF, PLTR, BAC, UBER, WMT, HOOD, TLT, SLV, IWM, BABA, INTC]
+  sectors:
+    tech: [AAPL, MSFT, NVDA, AMD, GOOGL, META, CRM, PLTR]
+    semis: [NVDA, AMD, SMCI, INTC]
+    consumer: [AMZN, TSLA, COST, NFLX, WMT, UBER, BABA]
+    financials: [JPM, BAC, XLF, PYPL, HOOD]
+    energy: [XOM, XLE]
+    crypto_adjacent: [MARA, HOOD]
+    macro_etf: [TLT, SLV, IWM, XLE, XLF]
+    index: [SPY, QQQ, IWM]
+
+risk:
+  broker_reconnect_in_session: true   # C-12.2 (2026-09-28): if the IBKR client is
+                                # DISCONNECTED, re-attempt the connection once per cycle
+                                # and reconcile before trading. The engine used to connect
+                                # once at startup; a gateway that came up later was never
+                                # used (09-28: 78 brokerless cycles). false = old behaviour.
+  reconcile_in_loop: true       # C-9.1 (2026-09-25): each cycle, compare the book with the
+                                # broker's positions and act on drift that PERSISTS two
+                                # cycles (broker_lost -> flag + stop closes; same-leg quantity
+                                # -> adopt broker qty; legged -> page, touch nothing). false =
+                                # detect-only, as before. Kill switch for Monday if needed.
+  account_size: 50000
+  # dated amendment 2026-08-03 (user): lanes hold independent books; combined
+  # per-underlying max-loss across BOTH lanes stays bounded by this cap
+  max_book_risk_per_underlying_usd: 2000
+  max_risk_per_trade_pct: 2.0
+  max_open_recommendations: 3
+  # L-d (2026-08-06): PER-LANE concurrency budgets. Funnel positions must never
+  # consume SCALP's slots or vice versa — lanes are isolated in execution state.
+  max_open_per_lane:            # PROVISIONAL, dated 2026-08-06, chosen not derived:
+    funnel: 3                   # inherited from max_open_recommendations
+    scalp: 7                    # inherited from paper_test_max_open
+  max_recommendations_per_day: 10  # 6->10 (2026-08-03 amendment, w/ lane isolation;
+                                   # thresholds/confidence/Claude-budget UNCHANGED)
+  # risk kernel (2026-07-02, Phase L step 1 — enforced in the PAPER path for
+  # burn-in; see src/engine/risk.py). Breaker halts NEW entries only; exits
+  # always run.
+  max_daily_loss_pct: 3.0       # ACCOUNT-LEVEL hard cap (-$1,500 on 50k). Two-tier
+                                # breaker (L-b, 2026-08-06): a lane tripping its own
+                                # limit halts THAT LANE only; this account cap halts
+                                # BOTH. Account risk intentionally spans lanes.
+  max_daily_loss_pct_per_lane:  # PER-LANE limits (L-b). Lane isolation in execution.
+    # PROVISIONAL and CHOSEN, not derived — dated 2026-08-06, same convention as
+    # entry_vwap_margin_atr. 2.0 sits under the 3.0 account cap so one lane can
+    # trip alone; no evidence yet says 2.0 is the right split. Revisit once the
+    # isolated-lane evaluation clock has data.
+    funnel: 2.0
+    scalp: 2.0
+  max_contracts: 10             # absolute per-trade size ceiling (liquidity sanity)
+  paper_exits:                  # deterministic exit rules for paper positions
+    profit_target_pct: 0.50     # close at 50% of max profit captured
+    stop_loss_pct: 0.50         # close at 50% of debit lost
+    flat_time_et: "15:45"       # day-trading mandate: flat before the close
+    same_day_expiry_flat_et: "15:30"  # C-9.3 (2026-09-25): anything expiring TODAY is
+                                      # closed from here — an outage at 15:45 let a
+                                      # spread expire into stock on 09-23. Applies to
+                                      # 0DTE (every SCALP-v3 trade); see the dated
+                                      # amendment in scalp_v3_forward_criteria.yaml.
+    entry_timeout_min: 30       # cancel unfilled entries (signal expired)
+    quote_outage_flatten_cycles: 4  # protective close after N unpriceable cycles
+                                    # (~20 min; alert at 2; 0 disables) — 2026-07-02
+    single_leg_target_gain_pct: 0.50  # single-leg longs: take profit at +50% of
+                                      # debit (2026-07-06 — closes the no-target
+                                      # gap; 0dte sleeve had 0 funnel trades)

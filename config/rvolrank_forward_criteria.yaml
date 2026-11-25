@@ -1,0 +1,187 @@
+# RVOL-RANK VIRTUAL SLEEVE — FORWARD ACCEPTANCE CRITERIA
+# Drafted + FROZEN 2026-07-18 (user directive: observation-mode sleeves for
+# discovery candidates; sleeve authorized in-session 2026-07-18 morning).
+# NO in-place edits — dated amendment blocks only. Evidence starts at
+# window_start; nothing before it counts.
+#
+# WHAT IS BEING TESTED (K17 as rescoped 2026-07-18 + K18 construction):
+# the RELATIVE opening-RVOL ranking signal, forward, on coverage-clean data.
+# Nightly job (scripts/rvolrank_sleeve.py, launchd 21:30 PT weekdays) takes
+# the day's rvolshadow top-20, pulls that day's 5m bars FRESH from Polygon
+# (no bars5m-store anchoring — K20 does not apply by construction), replays
+# the FROZEN K18 construction (rank-priority allocation, 20% ATR(14) stop,
+# no partial banking, 09:35-10:25 trigger window, 15:55 close-out), with the
+# closed study's cost model verbatim (5bps slippage, $0.005/share/side,
+# 1%-of-opening-volume participation cap, 10%-of-stop cancel guardrail).
+# A CONTROL lane runs identically each night on the day's top-20 by dollar
+# liquidity (same fresh pulls, same construction) — the coverage-clean
+# selection-vs-control comparison K17's store could not provide.
+# This is an after-the-fact daily simulation, NOT live execution: features
+# and fills use data unavailable before the close, computed nightly under
+# frozen rules. Stamped UNVALIDATED — PAPER ONLY in every output.
+
+window_start: "2026-07-20T00:00:00-07:00"     # first sim day = Mon 07-20
+ledger: "logs/observation/rvolrank_sleeve.jsonl"
+
+acceptance:                    # ALL must hold at evaluation; no peeking gates
+  min_sim_sessions: 60
+  adverse_regime_required: true    # >=1 session week containing SPY <= -2%
+                                   # day or VIX close > 25
+  selection_mean_R_min: 0.0        # selection lane positive in its own right
+  selection_t_min: 2.0
+  selection_vs_control_gap_min: 0.10   # per-trade mean R gap (audit: ~0.19)
+  worst_month_mean_R_min: -0.25
+  min_trades_selection: 400
+
+reporting:
+  nightly: trades per lane, pull failures (silent drops forbidden),
+    cumulative lane means, gap, regime tags
+  cadence: nightly line in ops checks + weekly summary
+
+# ══════════════════════════════════════════════════════════════════════
+# AMENDMENT A1 — 2026-07-23 (design fixes at 5% completion, BEFORE results;
+# dated-amendment block, no in-place edits to the original above).
+# ══════════════════════════════════════════════════════════════════════
+amendment_a1_2026_07_23:
+
+  # ITEM 1 — EXECUTABILITY FORK. Stock data is NOT real-time: IBKR stock API
+  # is NOT entitled (2026-07-22 probe: real-time OPRA options + futures only;
+  # stock API needs Network A/B/C subs we do not hold), and Polygon is
+  # 15-min delayed at source (rvol_shadow_scan.py). The 09:35 idealized lane
+  # requires real-time stock data we lack. Therefore:
+  gate_primary_lane: selection_exec        # 09:45 executable lane
+  control_primary_lane: control_exec       # 09:45 executable control
+  idealized_0935_lane: measurement_only    # delay-cost, NOT gate-eligible
+  realtime_stock_data_dependency: REQUIRED_FOR_09_35_LANE_AND_ABSENT
+  executable_entry_window: "09:45-10:25"   # skips 09:35-09:44 delayed triggers
+  note: exec lanes accrue from 2026-07-23 forward; the 3 historical sessions
+        are 09:35-only (idealized) and count as delay-cost measurement, not
+        toward the executable gate.
+
+  # ITEM 2 — MULTIPLICITY / DEFLATION (docs/rvolrank_trial_registry.md).
+  deflation:
+    trial_count_N: 27                      # enumerated lower bound; re-freeze UP if more
+    method: "Bonferroni FWER 0.05 one-sided over N trials"
+    dsr_expected_max_t_under_null: 2.03    # raw t=2.0 == best-of-noise
+    selection_t_min_DEFLATED: 2.9          # SUPERSEDES original selection_t_min: 2.0
+    rule: gates evaluate the executable selection lane against t >= 2.9
+
+  # ITEM 6 — LEDGER hygiene.
+  excluded_from_gates:
+    - "2026-07-15"     # pre-window catch-up replays; window_start = 2026-07-20
+    - "2026-07-16"
+    - "2026-07-17"
+
+  # ITEMS 3-5 (queued this session, measurement-only, no gate change):
+  #   3 cost stress tiers (base/2x/3x) + per-trade spread proxy
+  #   4 earnings/gap/halt tagging from Sharadar
+  #   5 market-cap + ADV join into the nightly scan
+
+  # ADDITION A (2026-07-23) — PRE-REGISTERED OUTCOME MATRIX at session 60.
+  # Evaluated: executable(09:45) selection lane vs deflated bar t>=2.9 AND
+  # gap>=0.10; "idealized" = the 09:35 lane on the same criteria. No other
+  # interpretations admissible.
+  outcome_matrix:
+    both_fail:            "KILL the sleeve."
+    both_pass:            "DEPLOY the executable spec."
+    idealized_pass_exec_fail:
+      label: "edge is INSIDE THE DELAY"
+      decision: "real-time stock data purchase — viable ONLY with sizing-up.
+                 Compute breakeven: monthly RT-data cost vs (edge R x realistic
+                 capacity) using item-5 cap/ADV data. Deploy only if breakeven
+                 clears with margin."
+    exec_pass_idealized_fail:
+      label: "accept the executable spec"
+      decision: "ACCEPT exec spec AFTER a regime-luck audit (does the exec
+                 edge survive removal of the best regime week / top-2 sessions)."
+
+  # ADDITION B (2026-07-23) — BINDING CONSTRAINT.
+  binding_constraint:
+    hard_min_exec_selection_trades: 400   # never relaxed
+    sessions_extend_to_meet_count: true   # min_sim_sessions is a floor, not a cap
+    nightly_report_required: [trades_per_session_run_rate, projected_sessions_to_400]
+
+  # ITEM 3 (2026-07-23) — COST STRESS TIERS (frozen). Gate must PASS at 'stress_2x'.
+  cost_tiers:
+    base:     {slippage_bps: 5,  per_share_side: 0.005}   # the frozen study model
+    stress_2x: {slippage_bps: 10, per_share_side: 0.010}   # gate-binding tier
+    stress_3x: {slippage_bps: 15, per_share_side: 0.015}   # reported, not binding
+    gate_binding_tier: stress_2x
+    per_trade_spread_proxy: "fill-bar high-low (NBBO if available) — nightly record"
+
+# ══════════════════════════════════════════════════════════════════════
+# AMENDMENT A2a — 2026-09-13 04:55 PT (PIN BLOCK; insertions only; written
+# BEFORE any number for the lanes registered here exists). RATIFIED by the
+# operator 2026-09-13 — see the ratification block at the end of this file.
+# ══════════════════════════════════════════════════════════════════════
+amendment_a2a_2026_09_13:
+  operator_ratification: RATIFIED_2026_09_13   # see ratification_2026_09_13 below
+  gate_unchanged: true               # A1's gate, bars, lanes, 400-trade floor all stand
+  facts_recorded:
+    - "IBKR paper acct DUQ000000 trades STK (trend-book fills on disk); A1's stock-API premise is stale"
+    - "IBKR stock market data REAL-TIME since 2026-08-05 per logs/ops/ibkr_entitlement.log — CAVEAT: single-name SPY/ARCA probe, not a market-wide feed"
+    - "Polygon whole-market snapshot endpoint works on the held key (13,183 tickers, one call; logs/ops/polygon_snapshot_probe.jsonl); its DELAY is measured 2026-09-14 09:36/09:51 ET"
+    - "the Polygon 5-req/min limit is gone (8 rapid calls -> 8x200 on 2026-09-13)"
+    - "the coded 09:45 exec lane is NOT executable as defined (the rank needs the 09:30-bar volume of ~1,900 names) and its allocation sorted(triggered)[:10] is decided after 10:25 (non-causal)"
+    - "control lane uses same-day dollar volume (end-of-day information); this biases the control UP (harsher for the gate); kept as the frozen control"
+  session_count_rule: "min_sim_sessions counts EXEC-lane sessions (rows carrying selection_exec), i.e. from 2026-07-23; 34 on 2026-09-11"
+  ledger_reading:
+    dedup: "byte-identical duplicate rows dedup by last generated stamp"
+    primary_gate_set: "the as-recorded ledger (no exclusions)"
+    registered_sensitivity: "hygiene set = primary minus post-hoc regenerated selections (2026-07-30, 2026-07-31) minus sessions with scan_errors > 10% of candidates (2026-07-29); reported BESIDE the primary at evaluation; effects known at freeze: sel_exec mean R -0.1221 -> -0.0731 (ex 07-30/31), -0.192 (ex 07-29)"
+    missed_sessions: "never backfilled"
+  statistics:
+    t_definition: "per-trade one-sample t on the selection lane; session-clustered t reported only"
+    worst_month: "complete calendar months only (>= 15 exec sessions)"
+    cost_tier: "every gate reads r_tiers.stress_2x, including the idealized outcome-matrix row"
+  measurement_lanes_registered:      # NOT gate-eligible; numbers may only exist after this commit
+    - selection_top10_only            # redesign_prereg reading: accept triggers only from ranks 1-10 (causal by rank)
+    - selection_causal_first10        # first 10 triggers by time among the top-20 (what a live engine can execute)
+    - control_exante                  # top-20 by prior-14-session avg dollar volume from the grouped store
+    - regime_tags                     # SPY day return (grouped store); VIX close from a named free source, prospective
+  deployment_decision_lane: "selection_causal_first10 at stress_2x; a pass on the coded non-causal lane alone never deploys"
+  registry: {trial_count_N: 30, deflated_t_bar: 2.94, dsr_expected_max_t_under_null: 2.07, note: "3 lanes registered here -> N 27 -> 30; bar re-frozen UP (Bonferroni FWER 0.05 one-sided)"}
+  paper_execution_lane: "RVOL-EXEC (separate process, separate stock client, own ledger logs/observation/rvol_exec_paper.jsonl, PAPER ONLY) measures the EXECUTION GAP vs selection_causal_first10 on the same names/days; its own criteria file follows in A2b after the 2026-09-14 delay probe"
+  a2b_pending: "adverse-regime extension rule; exec-window pin from the delay probe; RVOL-EXEC criteria"
+
+# ══════════════════════════════════════════════════════════════════════
+# AMENDMENT A2a-c — 2026-09-13 05:50 PT (CORRECTION to A2a, insertions
+# only, RATIFIED 2026-09-13). Three A2a definitions were written after
+# interim numbers were seen and one of them RELAXED a frozen clause; the
+# primary readings revert to the frozen wording and the new readings become
+# registered sensitivities with their known effects disclosed.
+# ══════════════════════════════════════════════════════════════════════
+amendment_a2a_c_2026_09_13:
+  operator_ratification: RATIFIED_2026_09_13   # see ratification_2026_09_13 below
+  supersedes: "amendment_a2a_2026_09_13.statistics and .ledger_reading.dedup"
+  worst_month:
+    primary: "ANY calendar month in the window, as frozen (L33: worst_month_mean_R_min -0.25), at r_tiers.stress_2x"
+    registered_sensitivity: "complete calendar months only (>= 15 exec sessions)"
+    known_effect_at_freeze: "primary: Jul -0.355 (6 sessions) / Sep-to-date -0.272 both below -0.25; sensitivity: Aug -0.008 (only complete month) passes"
+  t_definition:
+    primary: "per-trade one-sample t on the selection lane (as A1)"
+    registered_sensitivity: "session-clustered t"
+    known_effect_at_freeze: "per-trade -0.69 vs session-clustered -0.77 at interim (both below 2.94)"
+  dedup_rule: "one row per date: the row flagged supersedes_earlier_record wins; else the LAST row by generated stamp (covers 2026-07-20 n=8 -> n=10 repair and the byte-identical 2026-07-31 pair)"
+
+# ══════════════════════════════════════════════════════════════════════
+# RATIFICATION — 2026-09-13. Operator approved amendments A2a and A2a-c
+# ("Go ahead with the recommended change"), after being shown: the three
+# false premises the July rulebook rested on; that the registered lanes are
+# added BEFORE any of their numbers exist; that the deflated bar moves UP
+# 2.90 -> 2.94 and therefore makes the test HARDER; and that A2a originally
+# contained a relaxation of the worst-month clause written after the interim
+# numbers were seen, which was caught and reversed by A2a-c.
+# ══════════════════════════════════════════════════════════════════════
+ratification_2026_09_13:
+  ratified_by: operator
+  date: "2026-09-13"
+  covers: [amendment_a2a_2026_09_13, amendment_a2a_c_2026_09_13]
+  gate_unchanged: true          # ratification records facts + registrations; the pass/fail bar is untouched
+  effect:
+    - "the three corrected facts stand on the record (stock trading available; stock data real-time since 2026-08-05 on a single-name probe; the coded 09:45 'executable' lane is NOT executable and its allocation is non-causal)"
+    - "selection_top10_only, selection_causal_first10, control_exante and regime_tags are registered measurement lanes; none is gate-eligible"
+    - "deployment decisions read selection_causal_first10 at stress_2x; a pass on the coded non-causal lane alone never deploys"
+    - "deflated t-bar 2.94 at N=30 (raised, never lowered)"
+    - "worst-month PRIMARY is any calendar month as originally frozen; complete-months-only is a registered sensitivity with its effect disclosed"
+  not_covered: "amendment A2b (adverse-regime extension rule, exec-window pin, RVOL-EXEC criteria) remains UNWRITTEN and unratified"
