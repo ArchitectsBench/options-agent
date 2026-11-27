@@ -53,7 +53,7 @@ This is a public export of a private working repository, taken at one point in t
 
 Left out on purpose:
 
-- **Commit history.** The export is a single commit.
+- **Commit history.** This copy starts from a single export commit; later commits are changes made to the export itself.
 - **Market data.** All data files are removed, including the bar fixtures some tests read, so those tests fail here.
 - **Research workspace, internal notes and run journals.** The studies behind the configuration, and the daily operations reports.
 - **Logs.**
@@ -70,6 +70,8 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python -m pytest
 ```
+
+`pytest.ini` also lists `analysis/squeeze_buyzone/tests`; that folder belongs to the research workspace and is not in this copy.
 
 All 1,537 tests are collected in this copy. The full suite has not been run against the export, and the tests that read market-data fixtures need data that is not included.
 
